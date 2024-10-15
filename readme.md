@@ -4,6 +4,9 @@
 
 The DBT Column Lineage Extractor is a lightweight Python-based tool for extracting and analyzing data column lineage for dbt projects. This tool utilizes the [sqlglot](https://github.com/tobymao/sqlglot) library to parse and analyze SQL queries defined in your dbt models and maps their column lineage relationships.
 
+## GitHub Repository
+[dbt Column Lineage Extractor](https://github.com/canva-public/dbt-column-lineage-extractor)
+
 ## Features
 
 - Extract column level lineage for specified model columns, including direct and recursive relationships.

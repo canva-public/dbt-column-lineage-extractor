@@ -6,7 +6,7 @@ def main():
     parser = argparse.ArgumentParser(description="DBT Column Lineage Extractor CLI")
     parser.add_argument('--manifest', default='./inputs/manifest.json', help='Path to the manifest.json file, default to ./inputs/manifest.json')
     parser.add_argument('--catalog', default='./inputs/catalog.json', help='Path to the catalog.json file, default to ./inputs/catalog.json')
-    parser.add_argument('--dialect', default='snowflake', help='SQL dialect to use, default is snowflake')
+    parser.add_argument('--dialect', default='snowflake', help='SQL dialect to use, default is snowflake, more dialects at https://github.com/tobymao/sqlglot/tree/v25.24.5/sqlglot/dialects')
     parser.add_argument('--model', nargs='*', default=[], help='List of models to extract lineage for, default to all models')
     parser.add_argument('--output-dir', default='./outputs', help='Directory to write output json files, default to ./outputs')
     parser.add_argument('--show-ui', action='store_true', help='Flag to show lineage outputs in the console')

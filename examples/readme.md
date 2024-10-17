@@ -3,13 +3,12 @@
 1. Place your dbt `manifest.json` and `catalog.json` files in the `inputs` directory.
 2. **Customization**:
    - Set your dialect (only tested with `snowflake` so far) in the `main_step_1_direct.py` script.
-   - Modify the `li_selected_model` list in `main_step_1_direct.py` to specify the scan scope, or leave it empty to process all models.
+   - You can specify the scope of the models you want to extract column lineage for by adding them to the `li_selected_model` list, or leave it empty to process all models (recommended).
 
 3. Run the `main_step_1_direct.py` script to extract direct column lineage:
    ```bash
    python main_step_1_direct.py
    ```
-   - You can specify the models you want to extract column lineage for by adding them to the `li_selected_model` list or leave it empty to process all models (recommended).
 
 4. This will generate **direct** column lineage relationships for all models in the `outputs` directory.
    - `lineage_to_direct_parents.json`

@@ -1,5 +1,10 @@
 # DBT Column Lineage Extractor
 
+# DISCLAIMER
+
+**WARNING:** This tool is currently in beta and has only been tested on a limited number of dbt projects using the `snowflake` dialect. It might not perform as expected in every situation. Please report any issues or suggestions in the [Repository](https://github.com/canva-public/dbt-column-lineage-extractor)
+
+
 ## Overview
 
 The DBT Column Lineage Extractor is a lightweight Python-based tool for extracting and analyzing data column lineage for dbt projects. This tool utilizes the [sqlglot](https://github.com/tobymao/sqlglot) library to parse and analyze SQL queries defined in your dbt models and maps their column lineage relationships.
@@ -127,4 +132,5 @@ The structured JSON outputs can be used programmatically, or loaded into visuali
 ## Limitations
 - Doesn’t support parse certain syntax, e.g. lateral flatten
 - Doesn’t support dbt python models
+- Only tested with `snowflake` dialect so far
 

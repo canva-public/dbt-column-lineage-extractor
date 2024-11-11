@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='dbt_column_lineage_extractor',
-    version='0.1.2b2',
+    version='0.1.3b1',
     description='A package for extracting dbt column lineage',
     long_description=open('../README.md').read(),
     long_description_content_type='text/markdown',

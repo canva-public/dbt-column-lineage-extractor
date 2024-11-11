@@ -144,10 +144,10 @@ class DbtColumnLineageExtractor:
         table_name = table_name.lower()
 
         if table_name in self.node_mapping:
-            dbt_node = self.node_mapping[table_name]
+            dbt_node = self.node_mapping[table_name].lower()
         else:
             warnings.warn(f"Table {table_name} not found in node mapping")
-            dbt_node = f"_NOT_FOUND___{table_name}"
+            dbt_node = f"_NOT_FOUND___{table_name.lower()}"
             # raise ValueError(f"Table {table_name} not found in node mapping")
 
         return {"column": column_name, "dbt_node": dbt_node}
@@ -156,6 +156,7 @@ class DbtColumnLineageExtractor:
         columns_lineage = {key.lower(): {} for key in self.selected_models}
 
         for model_node, columns in lineage_map.items():
+            model_node = model_node.lower()
             for column, node in columns.items():
                 column = column.lower()
                 if picked_columns and column not in picked_columns:
@@ -180,10 +181,12 @@ class DbtColumnLineageExtractor:
         children_lineage = {}
 
         for child_model, columns in lineage_to_direct_parents.items():
+            child_model = child_model.lower()
             for child_column, parents in columns.items():
+                child_column = child_column.lower()
                 for parent in parents:
-                    parent_model = parent["dbt_node"]
-                    parent_column = parent["column"]
+                    parent_model = parent["dbt_node"].lower()
+                    parent_column = parent["column"].lower()
 
                     if parent_model not in children_lineage:
                         children_lineage[parent_model] = {}
@@ -192,13 +195,14 @@ class DbtColumnLineageExtractor:
                         children_lineage[parent_model][parent_column] = []
 
                     children_lineage[parent_model][parent_column].append(
-                        {"column": child_column.lower(), "dbt_node": child_model}
+                        {"column": child_column, "dbt_node": child_model}
                     )
         return children_lineage
 
     @staticmethod
     def find_all_related(lineage_map, model_node, column, visited=None):
         column = column.lower()
+        model_node = model_node.lower()
         if visited is None:
             visited = set()
         related = {}
@@ -222,6 +226,7 @@ class DbtColumnLineageExtractor:
 
     @staticmethod
     def find_all_related_with_structure(lineage_map, model_node, column, visited=None):
+        model_node = model_node.lower()
         column = column.lower()
         if visited is None:
             visited = set()
@@ -240,8 +245,10 @@ class DbtColumnLineageExtractor:
                     visited.add((related_model, related_column))
 
                     # Recursively get the structure for each related node
-                    subsequent_structure = DbtColumnLineageExtractor.find_all_related_with_structure(
-                        lineage_map, related_model, related_column, visited
+                    subsequent_structure = (
+                        DbtColumnLineageExtractor.find_all_related_with_structure(
+                            lineage_map, related_model, related_column, visited
+                        )
                     )
 
                     # Use a structure to show relationships distinctly
@@ -249,11 +256,11 @@ class DbtColumnLineageExtractor:
                         related_structure[related_model] = {}
 
                     # Add information about the column lineage
-                    related_structure[related_model][related_column] = {
-                        "+": subsequent_structure
-                    }
+                    related_structure[related_model][related_column] = {"+": subsequent_structure}
 
         return related_structure
+
+
 class DBTNodeCatalog:
     def __init__(self, node_data):
         self.database = node_data["metadata"]["database"]
@@ -282,4 +289,3 @@ class DBTNodeManifest:
 
 
 # TODO: add metadata columns to external tables
-

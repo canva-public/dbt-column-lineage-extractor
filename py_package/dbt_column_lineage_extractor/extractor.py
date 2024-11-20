@@ -270,7 +270,7 @@ class DBTNodeCatalog:
 
     @property
     def full_table_name(self):
-        return f"{self.database}.{self.schema}.{self.name}"
+        return f"{self.database}.{self.schema}.{self.name}".lower()
 
     def get_column_types(self):
         return {col_name: col_info["type"] for col_name, col_info in self.columns.items()}
@@ -285,7 +285,7 @@ class DBTNodeManifest:
 
     @property
     def full_table_name(self):
-        return f"{self.database}.{self.schema}.{self.name}"
+        return f"{self.database}.{self.schema}.{self.name}".lower()
 
 
 # TODO: add metadata columns to external tables

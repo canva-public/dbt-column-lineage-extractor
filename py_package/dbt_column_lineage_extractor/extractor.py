@@ -175,17 +175,17 @@ class DbtColumnLineageExtractor:
         """Find nodes matching a name without full node path prefixes"""
         # First look for models
         matching_nodes = [
-            node_name
-            for node_name in self.manifest["nodes"]
-            if self.manifest["nodes"][node_name]["resource_type"] == "model"
-            and self.manifest["nodes"][node_name]["name"] == node_name
+            node_id
+            for node_id in self.manifest["nodes"]
+            if self.manifest["nodes"][node_id]["resource_type"] == "model"
+            and self.manifest["nodes"][node_id]["name"] == node_name
         ]
         
         # Then look for sources
-        if not matching_nodes and "sources" in self.manifest:
-            for source_name, source_data in self.manifest["sources"].items():
+        if "sources" in self.manifest:
+            for source_id, source_data in self.manifest["sources"].items():
                 if source_data.get("name") == node_name:
-                    matching_nodes.append(source_name)
+                    matching_nodes.append(source_id)
         
         return matching_nodes
     
@@ -448,6 +448,12 @@ class DbtColumnLineageExtractor:
                     continue
 
                 columns_lineage[model_node_lower][column] = []
+                
+                # Handle the case where node is a list (empty lineage result)
+                if isinstance(node, list):
+                    continue
+                    
+                # Process nodes with a walk method
                 for n in node.walk():
                     if n.source.key == "table":
                         parent_columns = self.get_dbt_node_from_sqlglot_table_node(n)
@@ -456,6 +462,7 @@ class DbtColumnLineageExtractor:
                             and parent_columns not in columns_lineage[model_node_lower][column]
                         ):
                             columns_lineage[model_node_lower][column].append(parent_columns)
+                            
                 if not columns_lineage[model_node_lower][column]:
                     warnings.warn(f"No lineage found for {model_node} - {column}")
         return columns_lineage

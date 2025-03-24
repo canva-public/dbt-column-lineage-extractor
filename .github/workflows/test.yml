@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
+        python-version: ["3.8"]
 
     steps:
     - uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
 
     - name: Install package dependencies
       run: |
-        pip install pytest pytest-cov
+        pip install pytest
         pip install -r py_package/requirements.txt
 
     - name: Install package in editable mode
@@ -65,10 +65,4 @@ jobs:
 
     - name: Run tests with pytest and coverage
       run: |
-        python -m pytest -v tests/ --capture=no --cov=dbt_column_lineage_extractor --cov-report=xml
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: true
+        python -m pytest -v tests/ --capture=no

@@ -1,6 +1,7 @@
 import warnings
 from sqlglot.lineage import lineage, maybe_parse, SqlglotError, exp
 from . import utils
+import re
 
 
 class DbtColumnLineageExtractor:
@@ -10,6 +11,10 @@ class DbtColumnLineageExtractor:
         self.schema_dict = self._generate_schema_dict_from_catalog()
         self.node_mapping = self._get_dict_mapping_full_table_name_to_dbt_node()
         self.dialect = dialect
+        
+        # Store references to parent and child maps for easy access
+        self.parent_map = self.manifest.get("parent_map", {})
+        self.child_map = self.manifest.get("child_map", {})
 
         if not selected_models:
             # only select models from manifest nodes
@@ -19,7 +24,200 @@ class DbtColumnLineageExtractor:
                 if self.manifest["nodes"][x]["resource_type"] == "model"
             ]
         else:
-            self.selected_models = selected_models
+            # Parse dbt-style selectors
+            self.selected_models = self._parse_selectors(selected_models)
+
+    def _parse_selectors(self, selectors):
+        """
+        Parse dbt-style selectors to expand the list of selected models.
+        
+        Supports:
+        - Simple names: "model_name"
+        - Ancestors: "+model_name" (upstream/parent models)
+        - Descendants: "model_name+" (downstream/child models)
+        - Union: "model1 model2" (models matching either selector)
+        - Intersection: "model1,model2" (models matching both selectors)
+        - Tags: "tag:my_tag" (models with specific tag)
+        - Path: "path:models/finance" (models in specific path)
+        - Package: "package:my_package" (models in specific package)
+        
+        Returns a list of expanded model names.
+        """
+        if not selectors:
+            return []
+        
+        # If selectors is already a list of model names without any special syntax, return as is
+        if all(selector in self.manifest["nodes"] for selector in selectors):
+            return selectors
+        
+        # Handle list of selector expressions
+        expanded_models = set()
+        
+        for selector_expr in selectors:
+            # Check for intersection (comma-separated parts)
+            if "," in selector_expr:
+                parts = selector_expr.split(",")
+                intersection_sets = []
+                
+                for part in parts:
+                    # Recursively parse each part
+                    part_models = self._parse_selectors([part])
+                    intersection_sets.append(set(part_models))
+                
+                # Intersect all parts
+                if intersection_sets:
+                    result = intersection_sets[0]
+                    for s in intersection_sets[1:]:
+                        result = result.intersection(s)
+                    expanded_models.update(result)
+            
+            # Handle union (space-separated parts)
+            elif " " in selector_expr:
+                parts = selector_expr.split()
+                for part in parts:
+                    # Recursively parse each part
+                    part_models = self._parse_selectors([part])
+                    expanded_models.update(part_models)
+            
+            # Handle tag selector: tag:my_tag
+            elif selector_expr.startswith("tag:"):
+                tag = selector_expr[4:]
+                matching_models = self._get_models_by_tag(tag)
+                expanded_models.update(matching_models)
+            
+            # Handle path selector: path:models/finance
+            elif selector_expr.startswith("path:"):
+                path = selector_expr[5:]
+                matching_models = self._get_models_by_path(path)
+                expanded_models.update(matching_models)
+            
+            # Handle package selector: package:my_package
+            elif selector_expr.startswith("package:"):
+                package = selector_expr[8:]
+                matching_models = self._get_models_by_package(package)
+                expanded_models.update(matching_models)
+            
+            # Handle ancestors (upstream/parents): +model_name
+            elif selector_expr.startswith("+"):
+                model_name = selector_expr[1:]
+                if model_name in self.manifest["nodes"]:
+                    expanded_models.add(model_name)
+                    expanded_models.update(self._get_all_ancestors(model_name))
+                else:
+                    # Try to resolve without prefix
+                    matches = self._resolve_model_by_name(model_name)
+                    for match in matches:
+                        expanded_models.add(match)
+                        expanded_models.update(self._get_all_ancestors(match))
+            
+            # Handle descendants (downstream/children): model_name+
+            elif selector_expr.endswith("+"):
+                model_name = selector_expr[:-1]
+                if model_name in self.manifest["nodes"]:
+                    expanded_models.add(model_name)
+                    expanded_models.update(self._get_all_descendants(model_name))
+                else:
+                    # Try to resolve without prefix
+                    matches = self._resolve_model_by_name(model_name)
+                    for match in matches:
+                        expanded_models.add(match)
+                        expanded_models.update(self._get_all_descendants(match))
+            
+            # Handle direct model reference
+            elif selector_expr in self.manifest["nodes"]:
+                expanded_models.add(selector_expr)
+            
+            # Handle model name without resource type prefix
+            else:
+                # Try to find the model by name
+                matching_models = self._resolve_model_by_name(selector_expr)
+                expanded_models.update(matching_models)
+        
+        return list(expanded_models)
+    
+    def _resolve_model_by_name(self, model_name):
+        """Find models matching a name without full node path prefixes"""
+        matching_models = [
+            node_name
+            for node_name in self.manifest["nodes"]
+            if self.manifest["nodes"][node_name]["resource_type"] == "model"
+            and self.manifest["nodes"][node_name]["name"] == model_name
+        ]
+        return matching_models
+    
+    def _get_models_by_tag(self, tag):
+        """Get all models with a specific tag"""
+        matching_models = []
+        
+        for node_name, node_info in self.manifest["nodes"].items():
+            if node_info.get("resource_type") == "model" and tag in node_info.get("tags", []):
+                matching_models.append(node_name)
+                
+        return matching_models
+    
+    def _get_models_by_path(self, path):
+        """Get all models in a specific path"""
+        matching_models = []
+        
+        for node_name, node_info in self.manifest["nodes"].items():
+            if node_info.get("resource_type") == "model" and path in node_info.get("path", ""):
+                matching_models.append(node_name)
+                
+        return matching_models
+    
+    def _get_models_by_package(self, package):
+        """Get all models in a specific package"""
+        matching_models = []
+        
+        for node_name, node_info in self.manifest["nodes"].items():
+            if node_info.get("resource_type") == "model" and package == node_info.get("package_name", ""):
+                matching_models.append(node_name)
+                
+        return matching_models
+    
+    def _get_all_ancestors(self, model_name):
+        """Get all ancestor models (parents) using manifest's parent_map"""
+        ancestors = set()
+        visited = set()
+        
+        def collect_ancestors(node):
+            if node in visited:
+                return
+            
+            visited.add(node)
+            
+            # Get parents from parent_map
+            parents = self.parent_map.get(node, [])
+            for parent in parents:
+                # Only include models, not sources or other node types
+                if parent in self.manifest.get("nodes", {}) and self.manifest["nodes"][parent].get("resource_type") == "model":
+                    ancestors.add(parent)
+                    collect_ancestors(parent)
+        
+        collect_ancestors(model_name)
+        return ancestors
+    
+    def _get_all_descendants(self, model_name):
+        """Get all descendant models (children) using manifest's child_map"""
+        descendants = set()
+        visited = set()
+        
+        def collect_descendants(node):
+            if node in visited:
+                return
+                
+            visited.add(node)
+            
+            # Get children from child_map
+            children = self.child_map.get(node, [])
+            for child in children:
+                # Only include models, not other node types
+                if child in self.manifest.get("nodes", {}) and self.manifest["nodes"][child].get("resource_type") == "model":
+                    descendants.add(child)
+                    collect_descendants(child)
+        
+        collect_descendants(model_name)
+        return descendants
 
     def _generate_schema_dict_from_catalog(self, catalog=None):
         if not catalog:

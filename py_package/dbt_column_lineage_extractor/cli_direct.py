@@ -7,7 +7,21 @@ def main():
     parser.add_argument('--manifest', default='./inputs/manifest.json', help='Path to the manifest.json file, default to ./inputs/manifest.json')
     parser.add_argument('--catalog', default='./inputs/catalog.json', help='Path to the catalog.json file, default to ./inputs/catalog.json')
     parser.add_argument('--dialect', default='snowflake', help='SQL dialect to use, default is snowflake, more dialects at https://github.com/tobymao/sqlglot/tree/v25.24.5/sqlglot/dialects')
-    parser.add_argument('--model', nargs='*', default=[], help='List of models to extract lineage for, default to all models')
+    parser.add_argument(
+        '--model', 
+        nargs='*', 
+        default=[], 
+        help='''List of models to extract lineage for using dbt-style selectors:
+            - Simple model names: model_name
+            - Include ancestors: +model_name (include upstream/parent models)
+            - Include descendants: model_name+ (include downstream/child models)
+            - Union (either): "model1 model2" (models matching either selector)
+            - Intersection (both): "model1,model2" (models matching both selectors)
+            - Tag filtering: tag:my_tag (models with specific tag)
+            - Path filtering: path:models/finance (models in specific path)
+            - Package filtering: package:my_package (models in specific package)
+            Default behavior extracts lineage for all models.'''
+    )
     parser.add_argument('--model-list-json', help='Path to a JSON file containing a list of models to extract lineage for. If specified, this takes precedence over --model')
     parser.add_argument('--output-dir', default='./outputs', help='Directory to write output json files, default to ./outputs')
     parser.add_argument('--show-ui', action='store_true', help='Flag to show lineage outputs in the console')
@@ -31,6 +45,8 @@ def main():
         dialect=args.dialect,
     )
 
+    print(f"Processing {len(extractor.selected_models)} models after selector expansion")
+    
     lineage_map = extractor.build_lineage_map()
     lineage_to_direct_parents = extractor.get_columns_lineage_from_sqlglot_lineage_map(lineage_map)
     lineage_to_direct_children = (

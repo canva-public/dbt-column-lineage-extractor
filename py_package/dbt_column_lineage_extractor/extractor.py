@@ -50,11 +50,19 @@ class DbtColumnLineageExtractor:
     def _get_dict_mapping_full_table_name_to_dbt_node(self):
         mapping = {}
         for key, node in self.manifest["nodes"].items():
-            dbt_node = DBTNodeManifest(node)
-            mapping[dbt_node.full_table_name] = key
+            # Only include model, source, and seed nodes
+            if node.get("resource_type") in ["model", "source", "seed"]:
+                try:
+                    dbt_node = DBTNodeManifest(node)
+                    mapping[dbt_node.full_table_name] = key
+                except Exception as e:
+                    warnings.warn(f"Error processing node {key}: {e}")
         for key, node in self.manifest["sources"].items():
-            dbt_node = DBTNodeManifest(node)
-            mapping[dbt_node.full_table_name] = key
+            try:
+                dbt_node = DBTNodeManifest(node)
+                mapping[dbt_node.full_table_name] = key
+            except Exception as e:
+                warnings.warn(f"Error processing source {key}: {e}")
         return mapping
 
     def _get_list_of_columns_for_a_dbt_node(self, node):
@@ -65,7 +73,7 @@ class DbtColumnLineageExtractor:
         else:
             warnings.warn(f"Node {node} not found in catalog, maybe it's not materialized")
             return []
-        return list(columns.keys())
+        return [col.lower() for col in list(columns.keys())]
 
     def _get_parent_nodes_catalog(self, model_info):
         parent_nodes = model_info["depends_on"]["nodes"]
@@ -96,6 +104,7 @@ class DbtColumnLineageExtractor:
                 lineage_map[column_name] = lineage_node
             except SqlglotError as e:
                 print(f"Error processing model {model_node}, column {column_name}: {e}")
+                lineage_map[column_name] = []
 
         return lineage_map
 
@@ -201,31 +210,55 @@ class DbtColumnLineageExtractor:
 
     @staticmethod
     def find_all_related(lineage_map, model_node, column, visited=None):
+        """Find all related columns in lineage_map that connect to model_node.column."""
         column = column.lower()
         model_node = model_node.lower()
         if visited is None:
             visited = set()
+        
         related = {}
-        if model_node in lineage_map and column in lineage_map[model_node]:
-            for related_node in lineage_map[model_node][column]:
-                related_model = related_node["dbt_node"]
-                related_column = related_node["column"]
-                if (related_model, related_column) not in visited:
-                    visited.add((related_model, related_column))
-                    if related_model not in related:
-                        related[related_model] = []
+        
+        # Check if the model_node exists in lineage_map
+        if model_node not in lineage_map:
+            return related
+        
+        # Check if the column exists in the model_node
+        if column not in lineage_map[model_node]:
+            return related
+        
+        # Process each related node
+        for related_node in lineage_map[model_node][column]:
+            related_model = related_node["dbt_node"].lower()
+            related_column = related_node["column"].lower()
+            
+            if (related_model, related_column) not in visited:
+                visited.add((related_model, related_column))
+                
+                if related_model not in related:
+                    related[related_model] = []
+                
+                if related_column not in related[related_model]:
                     related[related_model].append(related_column)
-                    further_related = DbtColumnLineageExtractor.find_all_related(
-                        lineage_map, related_model, related_column, visited
-                    )
-                    for further_model, further_columns in further_related.items():
-                        if further_model not in related:
-                            related[further_model] = []
-                        related[further_model].extend(further_columns)
+                
+                # Recursively find further related columns
+                further_related = DbtColumnLineageExtractor.find_all_related(
+                    lineage_map, related_model, related_column, visited
+                )
+                
+                # Merge the results
+                for further_model, further_columns in further_related.items():
+                    if further_model not in related:
+                        related[further_model] = []
+                    
+                    for col in further_columns:
+                        if col not in related[further_model]:
+                            related[further_model].append(col)
+        
         return related
 
     @staticmethod
     def find_all_related_with_structure(lineage_map, model_node, column, visited=None):
+        """Find all related columns with hierarchical structure."""
         model_node = model_node.lower()
         column = column.lower()
         if visited is None:
@@ -233,36 +266,45 @@ class DbtColumnLineageExtractor:
 
         # Initialize the related structure for the current node and column.
         related_structure = {}
+        
+        # Return empty if model or column doesn't exist
+        if model_node not in lineage_map:
+            return related_structure
+            
+        if column not in lineage_map[model_node]:
+            return related_structure
 
-        if model_node in lineage_map and column in lineage_map[model_node]:
-            related_structure = {}  # Start with an empty dict for this level
+        # Process each related node
+        for related_node in lineage_map[model_node][column]:
+            related_model = related_node["dbt_node"].lower()
+            related_column = related_node["column"].lower()
 
-            for related_node in lineage_map[model_node][column]:
-                related_model = related_node["dbt_node"]
-                related_column = related_node["column"]
+            if (related_model, related_column) not in visited:
+                visited.add((related_model, related_column))
 
-                if (related_model, related_column) not in visited:
-                    visited.add((related_model, related_column))
-
-                    # Recursively get the structure for each related node
-                    subsequent_structure = (
-                        DbtColumnLineageExtractor.find_all_related_with_structure(
-                            lineage_map, related_model, related_column, visited
-                        )
+                # Recursively get the structure for each related node
+                subsequent_structure = (
+                    DbtColumnLineageExtractor.find_all_related_with_structure(
+                        lineage_map, related_model, related_column, visited
                     )
+                )
 
-                    # Use a structure to show relationships distinctly
-                    if related_model not in related_structure:
-                        related_structure[related_model] = {}
+                # Use a structure to show relationships distinctly
+                if related_model not in related_structure:
+                    related_structure[related_model] = {}
 
-                    # Add information about the column lineage
-                    related_structure[related_model][related_column] = {"+": subsequent_structure}
+                # Add information about the column lineage
+                related_structure[related_model][related_column] = {"+": subsequent_structure}
 
         return related_structure
 
 
 class DBTNodeCatalog:
     def __init__(self, node_data):
+        # Handle cases where metadata might be missing
+        if "metadata" not in node_data:
+            raise ValueError(f"Node data missing metadata field: {node_data}")
+            
         self.database = node_data["metadata"]["database"]
         self.schema = node_data["metadata"]["schema"]
         self.name = node_data["metadata"]["name"]

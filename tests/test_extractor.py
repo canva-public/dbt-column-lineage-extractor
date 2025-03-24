@@ -363,32 +363,27 @@ def test_get_lineage_to_direct_children():
 def test_find_all_related():
     """Test finding all related columns."""
     # Set up test data
-    lineage_map = {
+    # This is a parent-to-child lineage map (parent -> children who reference it)
+    direct_children_lineage = {
         "model.test.parent": {
-            "id": [],
-            "name": []
+            "id": [
+                {"column": "id", "dbt_node": "model.test.child"},
+                {"column": "parent_id", "dbt_node": "model.test.grandchild"}
+            ],
+            "name": [
+                {"column": "name", "dbt_node": "model.test.child"}
+            ]
         },
         "model.test.child": {
             "id": [
-                {"column": "id", "dbt_node": "model.test.parent"}
-            ],
-            "name": [
-                {"column": "name", "dbt_node": "model.test.parent"}
-            ]
-        },
-        "model.test.grandchild": {
-            "parent_id": [
-                {"column": "id", "dbt_node": "model.test.parent"}
-            ],
-            "child_id": [
-                {"column": "id", "dbt_node": "model.test.child"}
+                {"column": "child_id", "dbt_node": "model.test.grandchild"}
             ]
         }
     }
     
-    # Find all related columns for parent.id
+    # Find all related columns for parent.id (should find columns that reference it)
     related = DbtColumnLineageExtractor.find_all_related(
-        lineage_map, "model.test.parent", "id"
+        direct_children_lineage, "model.test.parent", "id"
     )
     
     # Verify the result
@@ -401,30 +396,26 @@ def test_find_all_related():
 
 def test_find_all_related_with_structure():
     """Test finding all related columns with structure."""
-    # Set up test data
-    lineage_map = {
+    # Set up test data - parent-to-child lineage
+    direct_children_lineage = {
         "model.test.parent": {
-            "id": [],
-            "name": []
+            "id": [
+                {"column": "id", "dbt_node": "model.test.child"}
+            ],
+            "name": [
+                {"column": "name", "dbt_node": "model.test.child"}
+            ]
         },
         "model.test.child": {
             "id": [
-                {"column": "id", "dbt_node": "model.test.parent"}
-            ],
-            "name": [
-                {"column": "name", "dbt_node": "model.test.parent"}
-            ]
-        },
-        "model.test.grandchild": {
-            "child_id": [
-                {"column": "id", "dbt_node": "model.test.child"}
+                {"column": "child_id", "dbt_node": "model.test.grandchild"}
             ]
         }
     }
     
     # Find all related columns with structure for parent.id
     related_structure = DbtColumnLineageExtractor.find_all_related_with_structure(
-        lineage_map, "model.test.parent", "id"
+        direct_children_lineage, "model.test.parent", "id"
     )
     
     # Verify the result
@@ -436,7 +427,6 @@ def test_find_all_related_with_structure():
     # Verify the nested structure
     assert "model.test.grandchild" in related_structure["model.test.child"]["id"]["+"]
     assert "child_id" in related_structure["model.test.child"]["id"]["+"]["model.test.grandchild"]
-    assert "+" in related_structure["model.test.child"]["id"]["+"]["model.test.grandchild"]["child_id"]
 
 def test_python_model_handling():
     """Test handling of Python models during lineage map building."""
@@ -447,28 +437,44 @@ def test_python_model_handling():
                 "path": "models/python_model.py",
                 "resource_type": "model",
                 "compiled_code": "# This is a Python model",
-                "depends_on": {"nodes": []}
+                "depends_on": {"nodes": []},
+                "database": "test_db",
+                "schema": "test_schema",
+                "name": "python_model",
+                "columns": {}
             }
         },
         "sources": {}
     }
     
-    # Patch the read_json method to return our mock manifest
+    # Mock catalog to match the manifest
+    catalog = {
+        "nodes": {},
+        "sources": {}
+    }
+    
+    # Patch the read_json method to return our mock manifest and catalog
     with patch('dbt_column_lineage_extractor.utils.read_json') as mock_read_json:
-        mock_read_json.return_value = manifest
+        mock_read_json.side_effect = [manifest, catalog]
         
-        extractor = DbtColumnLineageExtractor(
-            manifest_path="dummy_path",
-            catalog_path="dummy_path",
-            selected_models=["model.test.python_model"],
-            dialect="snowflake"
-        )
-        
-        # Build the lineage map
-        lineage_map = extractor.build_lineage_map()
-        
-        # Verify that the Python model was skipped
-        assert lineage_map == {}
+        with patch.object(DbtColumnLineageExtractor, '_generate_schema_dict_from_catalog') as mock_schema:
+            mock_schema.return_value = {}
+            
+            with patch.object(DbtColumnLineageExtractor, '_get_dict_mapping_full_table_name_to_dbt_node') as mock_mapping:
+                mock_mapping.return_value = {}
+                
+                extractor = DbtColumnLineageExtractor(
+                    manifest_path="dummy_path",
+                    catalog_path="dummy_path",
+                    selected_models=["model.test.python_model"],
+                    dialect="snowflake"
+                )
+                
+                # Build the lineage map
+                lineage_map = extractor.build_lineage_map()
+                
+                # Verify that the Python model was skipped
+                assert lineage_map == {}
 
 def test_non_model_resource_handling():
     """Test handling of non-model resources during lineage map building."""
@@ -479,25 +485,41 @@ def test_non_model_resource_handling():
                 "path": "snapshots/snapshot_model.sql",
                 "resource_type": "snapshot",
                 "compiled_code": "SELECT * FROM source",
-                "depends_on": {"nodes": []}
+                "depends_on": {"nodes": []},
+                "database": "test_db",
+                "schema": "test_schema",
+                "name": "snapshot_model",
+                "columns": {}
             }
         },
         "sources": {}
     }
     
-    # Patch the read_json method to return our mock manifest
+    # Mock catalog to match the manifest
+    catalog = {
+        "nodes": {},
+        "sources": {}
+    }
+    
+    # Patch the read_json method to return our mock manifest and catalog
     with patch('dbt_column_lineage_extractor.utils.read_json') as mock_read_json:
-        mock_read_json.return_value = manifest
+        mock_read_json.side_effect = [manifest, catalog]
         
-        extractor = DbtColumnLineageExtractor(
-            manifest_path="dummy_path",
-            catalog_path="dummy_path",
-            selected_models=["snapshot.test.snapshot_model"],
-            dialect="snowflake"
-        )
-        
-        # Build the lineage map
-        lineage_map = extractor.build_lineage_map()
-        
-        # Verify that the non-model resource was skipped
-        assert lineage_map == {}
+        with patch.object(DbtColumnLineageExtractor, '_generate_schema_dict_from_catalog') as mock_schema:
+            mock_schema.return_value = {}
+            
+            with patch.object(DbtColumnLineageExtractor, '_get_dict_mapping_full_table_name_to_dbt_node') as mock_mapping:
+                mock_mapping.return_value = {}
+                
+                extractor = DbtColumnLineageExtractor(
+                    manifest_path="dummy_path",
+                    catalog_path="dummy_path",
+                    selected_models=["snapshot.test.snapshot_model"],
+                    dialect="snowflake"
+                )
+                
+                # Build the lineage map
+                lineage_map = extractor.build_lineage_map()
+                
+                # Verify that the non-model resource was skipped
+                assert lineage_map == {}

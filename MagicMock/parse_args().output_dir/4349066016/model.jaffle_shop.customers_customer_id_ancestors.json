@@ -1,0 +1,13 @@
+{
+    "model.jaffle_shop.stg_customers": {
+        "customer_id": {
+            "+": {
+                "seed.jaffle_shop.raw_customers": {
+                    "id": {
+                        "+": {}
+                    }
+                }
+            }
+        }
+    }
+}

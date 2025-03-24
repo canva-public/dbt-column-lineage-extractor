@@ -175,17 +175,17 @@ class DbtColumnLineageExtractor:
         """Find nodes matching a name without full node path prefixes"""
         # First look for models
         matching_nodes = [
-            node_id
-            for node_id in self.manifest["nodes"]
-            if self.manifest["nodes"][node_id]["resource_type"] == "model"
-            and self.manifest["nodes"][node_id]["name"] == node_name
+            node_name
+            for node_name in self.manifest["nodes"]
+            if self.manifest["nodes"][node_name]["resource_type"] == "model"
+            and self.manifest["nodes"][node_name]["name"] == node_name
         ]
         
         # Then look for sources
-        if "sources" in self.manifest:
-            for source_id, source_data in self.manifest["sources"].items():
+        if not matching_nodes and "sources" in self.manifest:
+            for source_name, source_data in self.manifest["sources"].items():
                 if source_data.get("name") == node_name:
-                    matching_nodes.append(source_id)
+                    matching_nodes.append(source_name)
         
         return matching_nodes
     

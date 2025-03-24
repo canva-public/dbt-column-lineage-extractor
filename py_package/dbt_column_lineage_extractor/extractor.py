@@ -360,25 +360,32 @@ class DbtColumnLineageExtractor:
         return {"column": column_name, "dbt_node": dbt_node}
 
     def get_columns_lineage_from_sqlglot_lineage_map(self, lineage_map, picked_columns=[]):
-        columns_lineage = {key.lower(): {} for key in self.selected_models}
+        columns_lineage = {}
+        # Initialize all selected models before accessing them
+        for model in self.selected_models:
+            columns_lineage[model.lower()] = {}
 
         for model_node, columns in lineage_map.items():
-            model_node = model_node.lower()
+            model_node_lower = model_node.lower()
+            if model_node_lower not in columns_lineage:
+                # Add any model node from lineage_map that might not be in selected_models
+                columns_lineage[model_node_lower] = {}
+                
             for column, node in columns.items():
                 column = column.lower()
                 if picked_columns and column not in picked_columns:
                     continue
 
-                columns_lineage[model_node][column] = []
+                columns_lineage[model_node_lower][column] = []
                 for n in node.walk():
                     if n.source.key == "table":
                         parent_columns = self.get_dbt_node_from_sqlglot_table_node(n)
                         if (
                             parent_columns["dbt_node"] != model_node
-                            and parent_columns not in columns_lineage[model_node][column]
+                            and parent_columns not in columns_lineage[model_node_lower][column]
                         ):
-                            columns_lineage[model_node][column].append(parent_columns)
-                if not columns_lineage[model_node][column]:
+                            columns_lineage[model_node_lower][column].append(parent_columns)
+                if not columns_lineage[model_node_lower][column]:
                     warnings.warn(f"No lineage found for {model_node} - {column}")
         return columns_lineage
 

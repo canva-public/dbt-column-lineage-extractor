@@ -36,11 +36,12 @@ class DbtColumnLineageExtractor:
         
         Supported selector types:
         - Simple names: "model_name" or "model.package.model_name"
+        - Source references: "source.schema.name"
         
         Graph operators:
         - Ancestors: "+model_name" (include model and all its upstream/parent models)
         - Descendants: "model_name+" (include model and all its downstream/child models)
-        - Both Ancestors and Descendants: "+model_name+" (include model, all its upstream/parent models, and all its downstream/child models)
+        - Both: "+model_name+" (include model, all its ancestors and all its descendants)
         
         Set operators:
         - Union (OR): "model1 model2" (models matching either selector)
@@ -62,7 +63,7 @@ class DbtColumnLineageExtractor:
             return []
         
         # If selectors is already a list of model names without any special syntax, return as is
-        if all(selector in self.manifest["nodes"] for selector in selectors):
+        if all(selector in self.manifest["nodes"] or selector in self.manifest.get("sources", {}) for selector in selectors):
             return selectors
         
         # Handle list of selector expressions
@@ -115,16 +116,13 @@ class DbtColumnLineageExtractor:
             # Handle both ancestors and descendants: +model_name+
             elif selector_expr.startswith("+") and selector_expr.endswith("+"):
                 model_name = selector_expr[1:-1]
-                if model_name in self.manifest["nodes"]:
-                    # Add the model itself
+                if model_name in self.manifest["nodes"] or model_name in self.manifest.get("sources", {}):
                     expanded_models.add(model_name)
-                    # Add all ancestors
                     expanded_models.update(self._get_all_ancestors(model_name))
-                    # Add all descendants
                     expanded_models.update(self._get_all_descendants(model_name))
                 else:
                     # Try to resolve without prefix/suffix
-                    matches = self._resolve_model_by_name(model_name)
+                    matches = self._resolve_node_by_name(model_name)
                     for match in matches:
                         expanded_models.add(match)
                         expanded_models.update(self._get_all_ancestors(match))
@@ -133,12 +131,12 @@ class DbtColumnLineageExtractor:
             # Handle ancestors (upstream/parents): +model_name
             elif selector_expr.startswith("+"):
                 model_name = selector_expr[1:]
-                if model_name in self.manifest["nodes"]:
+                if model_name in self.manifest["nodes"] or model_name in self.manifest.get("sources", {}):
                     expanded_models.add(model_name)
                     expanded_models.update(self._get_all_ancestors(model_name))
                 else:
                     # Try to resolve without prefix
-                    matches = self._resolve_model_by_name(model_name)
+                    matches = self._resolve_node_by_name(model_name)
                     for match in matches:
                         expanded_models.add(match)
                         expanded_models.update(self._get_all_ancestors(match))
@@ -146,45 +144,65 @@ class DbtColumnLineageExtractor:
             # Handle descendants (downstream/children): model_name+
             elif selector_expr.endswith("+"):
                 model_name = selector_expr[:-1]
-                if model_name in self.manifest["nodes"]:
+                if model_name in self.manifest["nodes"] or model_name in self.manifest.get("sources", {}):
                     expanded_models.add(model_name)
                     expanded_models.update(self._get_all_descendants(model_name))
                 else:
                     # Try to resolve without prefix
-                    matches = self._resolve_model_by_name(model_name)
+                    matches = self._resolve_node_by_name(model_name)
                     for match in matches:
                         expanded_models.add(match)
                         expanded_models.update(self._get_all_descendants(match))
             
-            # Handle direct model reference
-            elif selector_expr in self.manifest["nodes"]:
+            # Handle direct node reference
+            elif selector_expr in self.manifest["nodes"] or selector_expr in self.manifest.get("sources", {}):
                 expanded_models.add(selector_expr)
             
-            # Handle model name without resource type prefix
+            # Handle source reference
+            elif selector_expr.startswith("source."):
+                if selector_expr in self.manifest.get("sources", {}):
+                    expanded_models.add(selector_expr)
+            
+            # Handle node name without resource type prefix
             else:
-                # Try to find the model by name
-                matching_models = self._resolve_model_by_name(selector_expr)
-                expanded_models.update(matching_models)
+                # Try to find the node by name
+                matching_nodes = self._resolve_node_by_name(selector_expr)
+                expanded_models.update(matching_nodes)
         
         return list(expanded_models)
     
-    def _resolve_model_by_name(self, model_name):
-        """Find models matching a name without full node path prefixes"""
-        matching_models = [
-            node_name
-            for node_name in self.manifest["nodes"]
-            if self.manifest["nodes"][node_name]["resource_type"] == "model"
-            and self.manifest["nodes"][node_name]["name"] == model_name
+    def _resolve_node_by_name(self, node_name):
+        """Find nodes matching a name without full node path prefixes"""
+        # First look for models
+        matching_nodes = [
+            node_id
+            for node_id in self.manifest["nodes"]
+            if self.manifest["nodes"][node_id]["resource_type"] == "model"
+            and self.manifest["nodes"][node_id]["name"] == node_name
         ]
-        return matching_models
+        
+        # Then look for sources
+        if "sources" in self.manifest:
+            for source_id, source_data in self.manifest["sources"].items():
+                if source_data.get("name") == node_name:
+                    matching_nodes.append(source_id)
+        
+        return matching_nodes
     
     def _get_models_by_tag(self, tag):
         """Get all models with a specific tag"""
         matching_models = []
         
+        # Check nodes (models, etc.)
         for node_name, node_info in self.manifest["nodes"].items():
             if node_info.get("resource_type") == "model" and tag in node_info.get("tags", []):
                 matching_models.append(node_name)
+        
+        # Also check sources
+        if "sources" in self.manifest:
+            for source_name, source_info in self.manifest["sources"].items():
+                if tag in source_info.get("tags", []):
+                    matching_models.append(source_name)
                 
         return matching_models
     
@@ -192,9 +210,16 @@ class DbtColumnLineageExtractor:
         """Get all models in a specific path"""
         matching_models = []
         
+        # Check nodes (models, etc.)
         for node_name, node_info in self.manifest["nodes"].items():
             if node_info.get("resource_type") == "model" and path in node_info.get("path", ""):
                 matching_models.append(node_name)
+        
+        # Also check sources
+        if "sources" in self.manifest:
+            for source_name, source_info in self.manifest["sources"].items():
+                if path in source_info.get("path", ""):
+                    matching_models.append(source_name)
                 
         return matching_models
     
@@ -202,9 +227,16 @@ class DbtColumnLineageExtractor:
         """Get all models in a specific package"""
         matching_models = []
         
+        # Check nodes (models, etc.)
         for node_name, node_info in self.manifest["nodes"].items():
             if node_info.get("resource_type") == "model" and package == node_info.get("package_name", ""):
                 matching_models.append(node_name)
+        
+        # Also check sources
+        if "sources" in self.manifest:
+            for source_name, source_info in self.manifest["sources"].items():
+                if package == source_info.get("package_name", ""):
+                    matching_models.append(source_name)
                 
         return matching_models
     
@@ -222,8 +254,11 @@ class DbtColumnLineageExtractor:
             # Get parents from parent_map
             parents = self.parent_map.get(node, [])
             for parent in parents:
-                # Only include models, not sources or other node types
-                if parent in self.manifest.get("nodes", {}) and self.manifest["nodes"][parent].get("resource_type") == "model":
+                # Include both models and sources
+                is_model = parent in self.manifest.get("nodes", {}) and self.manifest["nodes"][parent].get("resource_type") == "model"
+                is_source = parent in self.manifest.get("sources", {})
+                
+                if is_model or is_source:
                     ancestors.add(parent)
                     collect_ancestors(parent)
         
@@ -244,8 +279,11 @@ class DbtColumnLineageExtractor:
             # Get children from child_map
             children = self.child_map.get(node, [])
             for child in children:
-                # Only include models, not other node types
-                if child in self.manifest.get("nodes", {}) and self.manifest["nodes"][child].get("resource_type") == "model":
+                # Include both models and sources
+                is_model = child in self.manifest.get("nodes", {}) and self.manifest["nodes"][child].get("resource_type") == "model"
+                is_source = child in self.manifest.get("sources", {})
+                
+                if is_model or is_source:
                     descendants.add(child)
                     collect_descendants(child)
         

@@ -1,15 +1,10 @@
 name: Python Tests
 
 on:
-  push:
-    branches:
-    - '**' # Run on all branches
-    - '!main' # Exclude main branch
-    - '!master' # Exclude master branch
   pull_request:
     branches:
-    - main
-    - master
+      - main
+      - master
 
 jobs:
   test:

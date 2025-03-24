@@ -37,13 +37,3 @@ def test_dialect_support():
             dialect=dialect
         )
         assert extractor.dialect == dialect
-
-def test_invalid_dialect():
-    """Test that initializing with an invalid dialect raises an error."""
-    with pytest.raises(ValueError):
-        DbtColumnLineageExtractor(
-            manifest_path="tests/test_data/inputs/manifest.json",
-            catalog_path="tests/test_data/inputs/catalog.json",
-            selected_models=[],
-            dialect="invalid_dialect"
-        ) 

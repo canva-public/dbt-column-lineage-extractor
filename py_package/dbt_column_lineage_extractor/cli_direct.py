@@ -8,17 +8,26 @@ def main():
     parser.add_argument('--catalog', default='./inputs/catalog.json', help='Path to the catalog.json file, default to ./inputs/catalog.json')
     parser.add_argument('--dialect', default='snowflake', help='SQL dialect to use, default is snowflake, more dialects at https://github.com/tobymao/sqlglot/tree/v25.24.5/sqlglot/dialects')
     parser.add_argument('--model', nargs='*', default=[], help='List of models to extract lineage for, default to all models')
+    parser.add_argument('--model-list-json', help='Path to a JSON file containing a list of models to extract lineage for. If specified, this takes precedence over --model')
     parser.add_argument('--output-dir', default='./outputs', help='Directory to write output json files, default to ./outputs')
     parser.add_argument('--show-ui', action='store_true', help='Flag to show lineage outputs in the console')
 
     args = parser.parse_args()
 
-    # utils.clear_screen()
+    selected_models = args.model
+    if args.model_list_json:
+        try:
+            selected_models = utils.read_json(args.model_list_json)
+            if not isinstance(selected_models, list):
+                raise ValueError("The JSON file must contain a list of model names")
+        except Exception as e:
+            print(f"Error reading model list from JSON file: {e}")
+            return
 
     extractor = DbtColumnLineageExtractor(
         manifest_path=args.manifest,
         catalog_path=args.catalog,
-        selected_models=args.model,
+        selected_models=selected_models,
         dialect=args.dialect,
     )
 

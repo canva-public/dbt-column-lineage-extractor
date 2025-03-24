@@ -4,6 +4,7 @@
 2. **Customization**:
    - Set your dialect (only tested with `snowflake` so far) in the `main_step_1_direct.py` script.
    - You can specify the scope of the models you want to extract column lineage for by adding them to the `li_selected_model` list, or leave it empty to process all models (recommended).
+   - Alternatively, you can create a JSON file with a list of models and use the `--model-list-json` parameter when running the CLI.
 
 3. Run the `main_step_1_direct.py` script to extract direct column lineage:
    ```bash

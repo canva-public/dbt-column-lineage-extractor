@@ -58,6 +58,24 @@ First, generate column lineage relationships to model's direct parents and child
 ```bash
 dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json
 ```
+
+You can specify particular models using the `--model` parameter:
+```bash
+dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model model.jaffle_shop.customers model.jaffle_shop.orders
+```
+
+You can also specify models from a JSON file using the `--model-list-json` parameter:
+```bash
+dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model-list-json ./models.json
+```
+Where `models.json` is a JSON file containing a list of model names:
+```json
+[
+  "model.jaffle_shop.customers",
+  "model.jaffle_shop.orders"
+]
+```
+
 Then analyze recursive column lineage relationships for a specific model and column using the `dbt_column_lineage_recursive` command, e.g.:
 ```bash
 dbt_column_lineage_recursive --model model.jaffle_shop.stg_orders --column order_id
@@ -130,7 +148,6 @@ The structured JSON outputs can be used programmatically, or loaded into visuali
 ![visualize](images/visualize.png)
 
 ## Limitations
-- Doesn’t support parse certain syntax, e.g. lateral flatten
-- Doesn’t support dbt python models
+- Doesn't support parse certain syntax, e.g. lateral flatten
+- Doesn't support dbt python models
 - Only tested with `snowflake` dialect so far
-

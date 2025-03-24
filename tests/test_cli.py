@@ -104,4 +104,29 @@ def test_cli_direct_with_show_ui(test_data_dir, test_output_dir, capsys):
         
         captured = capsys.readouterr()
         assert "Lineage to Direct Parents" in captured.out
-        assert "Lineage to Direct Children" in captured.out 
+        assert "Lineage to Direct Children" in captured.out
+
+def test_cli_direct_with_model_list_json(test_data_dir, test_output_dir):
+    """Test direct CLI with model list from JSON file"""
+    model_list_path = os.path.join(test_output_dir, "model_list.json")
+    models = ["model.jaffle_shop.customers"]
+    
+    # Create model list JSON file
+    with open(model_list_path, 'w') as f:
+        json.dump(models, f)
+    
+    with patch('argparse.ArgumentParser.parse_args') as mock_args:
+        mock_args.return_value.manifest = os.path.join(test_data_dir, "inputs", "manifest.json")
+        mock_args.return_value.catalog = os.path.join(test_data_dir, "inputs", "catalog.json")
+        mock_args.return_value.dialect = "snowflake"
+        mock_args.return_value.model = []  # Empty list as this should be overridden by model_list_json
+        mock_args.return_value.model_list_json = model_list_path
+        mock_args.return_value.output_dir = str(test_output_dir)
+        mock_args.return_value.show_ui = False
+        
+        direct_main()
+        
+        # Verify outputs contain only the specified model
+        with open(os.path.join(test_output_dir, "lineage_to_direct_parents.json")) as f:
+            parents = json.load(f)
+            assert list(parents.keys())[0].startswith("model.jaffle_shop.customers") 

@@ -37,8 +37,7 @@ def main():
 
     # Save ancestors to files
     ancestors_file = os.path.join(args.output_dir, f"{args.model}_{args.column}_ancestors.json")
-    with open(ancestors_file, "w") as f:
-        json.dump(ancestors_structured, f, indent=4)
+    utils.write_dict_to_file(ancestors_structured, ancestors_file)
 
     print("========================================")
     # Find all descendants for a specific model and column
@@ -57,8 +56,7 @@ def main():
 
     # Save descendants to files
     descendants_file = os.path.join(args.output_dir, f"{args.model}_{args.column}_descendants.json")
-    with open(descendants_file, "w") as f:
-        json.dump(descendants_structured, f, indent=4)
+    utils.write_dict_to_file(descendants_structured, descendants_file)
 
     print("========================================")
     print(

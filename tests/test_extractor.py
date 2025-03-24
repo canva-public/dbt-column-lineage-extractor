@@ -177,6 +177,42 @@ def test_extract_lineage_for_model(mock_lineage):
     # Verify lineage was called for each column
     assert mock_lineage.call_count == 2
 
+def test_extract_lineage_with_real_data():
+    """Test extracting lineage for a model using actual test data."""
+    extractor = DbtColumnLineageExtractor(
+        manifest_path="tests/test_data/inputs/manifest.json",
+        catalog_path="tests/test_data/inputs/catalog.json",
+        dialect="snowflake"
+    )
+    
+    # Get a real model from the manifest
+    model_node = "model.jaffle_shop.customers"
+    model_info = extractor.manifest["nodes"][model_node]
+    model_sql = model_info["compiled_code"]
+    
+    # Get parent catalog and schema
+    parent_catalog = extractor._get_parent_nodes_catalog(model_info)
+    schema = extractor._generate_schema_dict_from_catalog(parent_catalog)
+    
+    # Get columns from the catalog
+    columns = extractor._get_list_of_columns_for_a_dbt_node(model_node)
+    
+    # Call the method
+    lineage_map = extractor._extract_lineage_for_model(
+        model_sql=model_sql,
+        schema=schema,
+        model_node=model_node,
+        selected_columns=columns
+    )
+    
+    # Verify the result
+    assert lineage_map
+    assert isinstance(lineage_map, dict)
+    assert len(lineage_map) > 0
+    
+    # Check that at least one column has lineage information
+    assert any(lineage for lineage in lineage_map.values())
+
 @patch('dbt_column_lineage_extractor.extractor.lineage')
 def test_extract_lineage_error_handling(mock_lineage):
     """Test error handling during lineage extraction."""
@@ -231,6 +267,23 @@ def test_full_lineage_map_build():
     assert model_columns
     assert isinstance(model_columns, dict)
     assert len(model_columns) > 0
+    
+    # Get actual column names from catalog
+    columns = extractor._get_list_of_columns_for_a_dbt_node(selected_models[0])
+    
+    # Verify all expected columns are in the lineage map
+    for column in columns:
+        assert column in model_columns
+    
+    # Verify that processed columns have some lineage information
+    # For our test model, we expect at least one column to have lineage data
+    has_lineage = False
+    for column, lineage_data in model_columns.items():
+        if lineage_data:  # If not empty
+            has_lineage = True
+            break
+    
+    assert has_lineage, "No lineage information found for any column"
 
 def test_get_dbt_node_from_sqlglot_table_node():
     """Test converting sqlglot table nodes to dbt nodes."""
@@ -306,6 +359,48 @@ def test_get_columns_lineage_from_sqlglot_lineage_map():
     assert len(columns_lineage["model.test.child"]["id"]) == 1
     assert columns_lineage["model.test.child"]["id"][0]["dbt_node"] == "model.test.parent"
     assert columns_lineage["model.test.child"]["id"][0]["column"] == "id"
+
+def test_column_lineage_with_real_data():
+    """Test the full column lineage extraction process with real data."""
+    # Use a real model from test data
+    selected_models = ["model.jaffle_shop.customers"]
+    
+    extractor = DbtColumnLineageExtractor(
+        manifest_path="tests/test_data/inputs/manifest.json",
+        catalog_path="tests/test_data/inputs/catalog.json",
+        selected_models=selected_models,
+        dialect="snowflake"
+    )
+    
+    # First build the lineage map
+    lineage_map = extractor.build_lineage_map()
+    
+    # Now extract column lineage from the lineage map
+    columns_lineage = extractor.get_columns_lineage_from_sqlglot_lineage_map(lineage_map)
+    
+    # Verify the result
+    assert columns_lineage
+    assert selected_models[0].lower() in columns_lineage
+    
+    model_columns = columns_lineage[selected_models[0].lower()]
+    assert model_columns
+    assert isinstance(model_columns, dict)
+    
+    # The customer model includes data from stg_customers, stg_orders, and stg_payments
+    # Verify that at least one column has parent nodes
+    has_parents = False
+    for column, parents in model_columns.items():
+        if parents:  # If not empty
+            has_parents = True
+            # Verify parent format
+            for parent in parents:
+                assert "column" in parent
+                assert "dbt_node" in parent
+                # In this example, it should reference one of the staging models
+                assert parent["dbt_node"].startswith(("model.jaffle_shop.stg_", "source."))
+            break
+    
+    assert has_parents, "No parent information found for any column"
 
 def test_get_lineage_to_direct_children():
     """Test getting lineage to direct children from lineage to direct parents."""

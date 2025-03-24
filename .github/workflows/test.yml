@@ -1,0 +1,38 @@
+name: Python Tests
+
+on:
+  push:
+    branches:
+    - '**' # Run on all branches
+    - '!main' # Exclude main branch
+    - '!master' # Exclude master branch
+  pull_request:
+    branches:
+    - main
+    - master
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [ "3.9", "3.10", "3.11" ]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        pip install -r py_package/requirements.txt
+        pip install -e py_package/
+
+    - name: Run tests with pytest
+      run: |
+        pytest tests/

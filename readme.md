@@ -16,6 +16,7 @@ The DBT Column Lineage Extractor is a lightweight Python-based tool for extracti
 
 - Extract column level lineage for specified model columns, including direct and recursive relationships.
 - Output results in a human-readable JSON format, which can be programmatically integrated for use cases such as data impact analysis, data tagging, etc.; or visualized with other tools.
+- Support for dbt-style model selection syntax, allowing easy selection of models using familiar patterns.
 
 
 ## Installation
@@ -59,9 +60,41 @@ First, generate column lineage relationships to model's direct parents and child
 dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json
 ```
 
-You can specify particular models using the `--model` parameter:
+You can specify particular models using the `--model` parameter with support for dbt-style selectors:
 ```bash
-dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model model.jaffle_shop.customers model.jaffle_shop.orders
+dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model "customers orders"
+```
+
+#### Model Selection Syntax
+
+The tool supports dbt-style model selection syntax, similar to what you'd use with dbt commands:
+
+**Graph Operators:**
+- `+model_name` - Include the model and all its ancestors (upstream models)
+- `model_name+` - Include the model and all its descendants (downstream models)
+
+**Set Operators:**
+- `model1 model2` - Select models that match either selector (union)
+- `model1,model2` - Select models that match both selectors (intersection)
+
+**Resource Selectors:**
+- `tag:daily` - Select models with the tag "daily"
+- `path:models/finance` - Select models in the specified path
+- `package:marketing` - Select models from the specified package
+
+**Examples:**
+```bash
+# Select all finance models and their dependencies
+dbt_column_lineage_direct --model "+tag:finance"
+
+# Select order models and their downstream dependencies
+dbt_column_lineage_direct --model "orders+"
+
+# Select models that are both daily and in the finance package
+dbt_column_lineage_direct --model "tag:daily,package:finance"
+
+# Select models in the core package or downstream from customers
+dbt_column_lineage_direct --model "package:core customers+"
 ```
 
 You can also specify models from a JSON file using the `--model-list-json` parameter:

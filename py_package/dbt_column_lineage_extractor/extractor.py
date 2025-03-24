@@ -31,17 +31,31 @@ class DbtColumnLineageExtractor:
         """
         Parse dbt-style selectors to expand the list of selected models.
         
-        Supports:
-        - Simple names: "model_name"
-        - Ancestors: "+model_name" (upstream/parent models)
-        - Descendants: "model_name+" (downstream/child models)
-        - Union: "model1 model2" (models matching either selector)
-        - Intersection: "model1,model2" (models matching both selectors)
+        This implements a subset of dbt's node selection syntax, allowing you to select models
+        using the same patterns you're familiar with from dbt commands.
+        
+        Supported selector types:
+        - Simple names: "model_name" or "model.package.model_name"
+        
+        Graph operators:
+        - Ancestors: "+model_name" (include model and all its upstream/parent models)
+        - Descendants: "model_name+" (include model and all its downstream/child models)
+        
+        Set operators:
+        - Union (OR): "model1 model2" (models matching either selector)
+        - Intersection (AND): "model1,model2" (models matching both selectors)
+        
+        Resource selectors:
         - Tags: "tag:my_tag" (models with specific tag)
         - Path: "path:models/finance" (models in specific path)
         - Package: "package:my_package" (models in specific package)
         
-        Returns a list of expanded model names.
+        These selectors can be combined in complex ways, such as:
+        - "tag:daily,+orders" (models tagged as 'daily' AND are also ancestors of 'orders')
+        - "customers+ tag:finance" (descendants of 'customers' OR models with 'finance' tag)
+        
+        Returns:
+            list: Expanded list of model names after applying selector logic
         """
         if not selectors:
             return []

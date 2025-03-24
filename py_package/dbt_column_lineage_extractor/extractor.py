@@ -40,6 +40,7 @@ class DbtColumnLineageExtractor:
         Graph operators:
         - Ancestors: "+model_name" (include model and all its upstream/parent models)
         - Descendants: "model_name+" (include model and all its downstream/child models)
+        - Both Ancestors and Descendants: "+model_name+" (include model, all its upstream/parent models, and all its downstream/child models)
         
         Set operators:
         - Union (OR): "model1 model2" (models matching either selector)
@@ -110,6 +111,24 @@ class DbtColumnLineageExtractor:
                 package = selector_expr[8:]
                 matching_models = self._get_models_by_package(package)
                 expanded_models.update(matching_models)
+            
+            # Handle both ancestors and descendants: +model_name+
+            elif selector_expr.startswith("+") and selector_expr.endswith("+"):
+                model_name = selector_expr[1:-1]
+                if model_name in self.manifest["nodes"]:
+                    # Add the model itself
+                    expanded_models.add(model_name)
+                    # Add all ancestors
+                    expanded_models.update(self._get_all_ancestors(model_name))
+                    # Add all descendants
+                    expanded_models.update(self._get_all_descendants(model_name))
+                else:
+                    # Try to resolve without prefix/suffix
+                    matches = self._resolve_model_by_name(model_name)
+                    for match in matches:
+                        expanded_models.add(match)
+                        expanded_models.update(self._get_all_ancestors(match))
+                        expanded_models.update(self._get_all_descendants(match))
             
             # Handle ancestors (upstream/parents): +model_name
             elif selector_expr.startswith("+"):

@@ -4,7 +4,8 @@
 2. **Customization**:
    - Set your dialect (only tested with `snowflake` so far) in the `main_step_1_direct.py` script.
    - You can specify the scope of the models you want to extract column lineage for by adding them to the `li_selected_model` list, or leave it empty to process all models (recommended).
-   - When specifying models, you can use dbt-style selectors like `+model_name` (ancestors), `model_name+` (descendants), `tag:my_tag` (tag filtering), etc.
+   - When specifying models, you can use dbt-style selectors like `+model_name` (ancestors), `model_name+` (descendants), `+model_name+` (entire lineage), `tag:my_tag` (tag filtering), etc.
+   - Both models and sources are supported in selectors (e.g., `source.schema.table`).
    - Alternatively, you can create a JSON file with a list of models and use the `--model-list-json` parameter when running the CLI.
 
 3. Run the `main_step_1_direct.py` script to extract direct column lineage:
@@ -30,7 +31,16 @@ li_selected_model = [
     "tag:finance",
     
     # Include models that are both daily-tagged AND in the core package
-    "tag:daily,package:core"
+    "tag:daily,package:core",
+    
+    # Include a specific source
+    "source.raw.customers",
+    
+    # Include a source and all its downstream dependencies
+    "source.raw.orders+",
+    
+    # Get the entire lineage (upstream and downstream) of a source
+    "+source.raw.payments+"
 ]
 
 extractor = DbtColumnLineageExtractor(

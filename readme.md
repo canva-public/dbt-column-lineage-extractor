@@ -16,7 +16,7 @@ The DBT Column Lineage Extractor is a lightweight Python-based tool for extracti
 
 - Extract column level lineage for specified model columns, including direct and recursive relationships.
 - Output results in a human-readable JSON format, which can be programmatically integrated for use cases such as data impact analysis, data tagging, etc.; or visualized with other tools.
-- Support for dbt-style model selection syntax, allowing easy selection of models using familiar patterns.
+- Support for dbt-style model selection syntax, allowing easy selection of models and sources using familiar patterns.
 
 
 ## Installation
@@ -69,9 +69,14 @@ dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/c
 
 The tool supports dbt-style model selection syntax, similar to what you'd use with dbt commands:
 
+**Node Types:**
+- Regular models: `model_name` or `model.package.model_name`
+- Source nodes: `source.schema.table`
+
 **Graph Operators:**
 - `+model_name` - Include the model and all its ancestors (upstream models)
 - `model_name+` - Include the model and all its descendants (downstream models)
+- `+model_name+` - Include the model, all its ancestors, and all its descendants (entire lineage)
 
 **Set Operators:**
 - `model1 model2` - Select models that match either selector (union)
@@ -95,6 +100,15 @@ dbt_column_lineage_direct --model "tag:daily,package:finance"
 
 # Select models in the core package or downstream from customers
 dbt_column_lineage_direct --model "package:core customers+"
+
+# Select a specific source
+dbt_column_lineage_direct --model "source.raw.customers"
+
+# Select a source and its downstream dependencies
+dbt_column_lineage_direct --model "source.raw.customers+"
+
+# Select a source and its entire lineage (both upstream and downstream)
+dbt_column_lineage_direct --model "+source.raw.customers+"
 ```
 
 You can also specify models from a JSON file using the `--model-list-json` parameter:
@@ -105,7 +119,8 @@ Where `models.json` is a JSON file containing a list of model names:
 ```json
 [
   "model.jaffle_shop.customers",
-  "model.jaffle_shop.orders"
+  "model.jaffle_shop.orders",
+  "source.raw.customers"
 ]
 ```
 

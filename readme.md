@@ -62,7 +62,7 @@ dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/c
 
 You can specify particular models using the `--model` parameter with support for dbt-style selectors:
 ```bash
-dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model "customers orders"
+dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model +orders+
 ```
 
 #### Model Selection Syntax

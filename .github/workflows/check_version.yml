@@ -3,7 +3,7 @@ name: Check Version Update
 on:
   pull_request:
     branches:
-      - master
+      - main
     paths:
       - 'py_package/setup.py'
 
@@ -28,20 +28,20 @@ jobs:
         echo "pr_version=$PR_VERSION" >> $GITHUB_OUTPUT
         echo "PR Version: $PR_VERSION"
 
-    - name: Extract master version
-      id: master_version
+    - name: Extract main version
+      id: main_version
       run: |
-        git fetch origin master
-        MASTER_VERSION=$(git show origin/master:py_package/setup.py | grep -oP "version='\K[^']+")
-        echo "master_version=$MASTER_VERSION" >> $GITHUB_OUTPUT
-        echo "Master Version: $MASTER_VERSION"
+        git fetch origin main
+        MAIN_VERSION=$(git show origin/main:py_package/setup.py | grep -oP "version='\K[^']+")
+        echo "main_version=$MAIN_VERSION" >> $GITHUB_OUTPUT
+        echo "Main Version: $MAIN_VERSION"
 
     - name: Compare versions
       id: compare_versions
       run: |
-        if [ "${{ steps.pr_version.outputs.pr_version }}" == "${{ steps.master_version.outputs.master_version }}" ]; then
-          echo "::error::Version in setup.py must be updated from '${{ steps.master_version.outputs.master_version }}' when making a PR to master branch"
+        if [ "${{ steps.pr_version.outputs.pr_version }}" == "${{ steps.main_version.outputs.main_version }}" ]; then
+          echo "::error::Version in setup.py must be updated from '${{ steps.main_version.outputs.main_version }}' when making a PR to main branch"
           exit 1
         else
-          echo "Version was updated from '${{ steps.master_version.outputs.master_version }}' to '${{ steps.pr_version.outputs.pr_version }}'"
+          echo "Version was updated from '${{ steps.main_version.outputs.main_version }}' to '${{ steps.pr_version.outputs.pr_version }}'"
         fi 

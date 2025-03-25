@@ -3,7 +3,7 @@
 1. Place your dbt `manifest.json` and `catalog.json` files in the `inputs` directory.
 2. **Customization**:
    - Set your dialect (only tested with `snowflake` so far) in the `main_step_1_direct.py` script.
-   - You can specify the scope of the models you want to extract column lineage for by adding them to the `li_selected_model` list, or leave it empty to process all models (recommended).
+   - You can specify the scope of the models you want to extract column lineage for by adding them to the `li_selected_model` list, or leave it empty to process all models.
    - When specifying models, you can use dbt-style selectors like `+model_name` (ancestors), `model_name+` (descendants), `+model_name+` (entire lineage), `tag:my_tag` (tag filtering), etc.
    - Both models and sources are supported in selectors (e.g., `source.schema.table`).
    - Alternatively, you can create a JSON file with a list of models and use the `--model-list-json` parameter when running the CLI.

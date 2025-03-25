@@ -22,7 +22,7 @@ The DBT Column Lineage Extractor is a lightweight Python-based tool for extracti
 ## Installation
 ### pip installation
 ```
-pip install dbt-column-lineage-extractor==0.1.4b1
+pip install dbt-column-lineage-extractor==0.1.5b1
 ```
 
 ## Required Input Files

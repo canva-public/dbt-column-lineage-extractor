@@ -1,8 +1,11 @@
 name: Publish Python Package
 
 on:
-  release:
-    types: [created]
+  push:
+    branches:
+      - master
+    paths:
+      - 'py_package/**'
 
 jobs:
   deploy:

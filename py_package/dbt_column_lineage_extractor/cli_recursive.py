@@ -9,7 +9,7 @@ from dbt_column_lineage_extractor.visualization import create_html_viewer, conve
 
 def main():
     parser = argparse.ArgumentParser(description="Recursive DBT Column Lineage Extractor CLI")
-    parser.add_argument('--model', required=True, help='Model to find lineage for, must be full node path (e.g. "model.jaffle_shop.customers")')
+    parser.add_argument('--model', required=True, help='Model to find lineage for, can be short name (e.g. "customers") or full node path (e.g. "model.jaffle_shop.customers")')
     parser.add_argument('--column', required=True, help='Column name to find lineage for, e.g. order_id')
     parser.add_argument('--lineage-parents-file', default='./outputs/lineage_to_direct_parents.json',
                         help='Path to the lineage_to_direct_parents.json file, default to ./outputs/lineage_to_direct_parents.json')

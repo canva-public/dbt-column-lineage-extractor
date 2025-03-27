@@ -405,12 +405,15 @@ def main():
 
         # Save outputs based on format
         if args.output_format in ['json', 'both']:
+            # Create safe filenames by replacing dots with underscores
+            safe_model_name = model_node.replace('.', '_')
+            
             # Save ancestors to files
-            ancestors_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_ancestors.json")
+            ancestors_file = os.path.join(args.output_dir, f"{safe_model_name}_{args.column}_ancestors.json")
             utils.write_dict_to_file(ancestors_structured, ancestors_file)
             
             # Save descendants to files
-            descendants_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_descendants.json")
+            descendants_file = os.path.join(args.output_dir, f"{safe_model_name}_{args.column}_descendants.json")
             utils.write_dict_to_file(descendants_structured, descendants_file)
             
             print("========================================")

@@ -88,7 +88,7 @@ See the [readme file](./examples/readme.md) in the `examples` directory for more
 ## Outputs
 
 ### 1. Mermaid Diagrams for visualization
-
+The tool automatically generates a visualization using Mermaid diagrams
 Example Mermaid visualization:
 
 ![mermaid_example](images/mermaid_example.png)

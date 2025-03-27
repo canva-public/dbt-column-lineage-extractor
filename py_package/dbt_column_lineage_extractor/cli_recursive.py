@@ -4,6 +4,159 @@ import json
 import dbt_column_lineage_extractor.utils as utils
 from dbt_column_lineage_extractor import DbtColumnLineageExtractor
 
+def convert_to_mermaid(model_node, column, ancestors_structured, descendants_structured):
+    """Convert lineage data to Mermaid flowchart format."""
+    mermaid_lines = [
+        "flowchart TD",
+        "    %% Styles",
+        "    classDef model fill:#e3f2fd,stroke:#1565c0",
+        "    classDef column fill:#f3e5f5,stroke:#6a1b9a",
+        "    classDef ancestorModel fill:#e1f5fe,stroke:#01579b",
+        "    classDef ancestorColumn fill:#e8f5e9,stroke:#1b5e20",
+        "    classDef descendantModel fill:#f3e5f5,stroke:#4a148c",
+        "    classDef descendantColumn fill:#fce4ec,stroke:#880e4f",
+        "    classDef centralModel fill:#fff9c4,stroke:#f57f17,stroke-width:3px",
+        "    classDef centralColumn fill:#ffecb3,stroke:#ff6f00,stroke-width:2px",
+        "    %% Link styles",
+        "    linkStyle default stroke:#666,stroke-width:2px",
+        "    %% Nodes and relationships"
+    ]
+    visited_models = set()
+    visited_columns = set()
+    model_relationships = set()  # Track model relationships to avoid duplicates
+    link_count = 0  # Counter for link styles
+    
+    def get_model_name(full_node):
+        """Extract model name from full node path."""
+        return full_node.split('.')[-1]
+    
+    def add_model_and_column(node, col, direction=None):
+        """Add model and column nodes with appropriate styling."""
+        nonlocal link_count
+        model_id = f"model_{node}".replace('.', '_')
+        column_id = f"{node}_{col}".replace('.', '_')
+        model_label = get_model_name(node)
+        
+        # Add model node if not visited
+        if model_id not in visited_models:
+            mermaid_lines.append(f"    {model_id}[{model_label}]")
+            visited_models.add(model_id)
+            # Apply style based on direction
+            if direction == 'up':
+                mermaid_lines.append(f"    class {model_id} ancestorModel")
+            elif direction == 'down':
+                mermaid_lines.append(f"    class {model_id} descendantModel")
+            else:
+                mermaid_lines.append(f"    class {model_id} model")
+        
+        # Add column node if not visited
+        if column_id not in visited_columns:
+            mermaid_lines.append(f"    {column_id}{{'{col}'}}") # Use curly braces for column nodes
+            visited_columns.add(column_id)
+            # Apply style based on direction
+            if direction == 'up':
+                mermaid_lines.append(f"    class {column_id} ancestorColumn")
+            elif direction == 'down':
+                mermaid_lines.append(f"    class {column_id} descendantColumn")
+            else:
+                mermaid_lines.append(f"    class {column_id} column")
+        
+        # Connect model to column with a dotted line
+        mermaid_lines.append(f"    {model_id} -.- {column_id}")
+        # Style the connection line to be thinner and lighter
+        mermaid_lines.append(f"    linkStyle {link_count} stroke:#999,stroke-width:1px,stroke-dasharray:3")
+        link_count += 1
+        
+        return model_id, column_id
+    
+    def process_structure(structure, direction='up', depth=0):
+        """Process the structured lineage data recursively."""
+        nonlocal link_count
+        for node, columns in structure.items():
+            for col, details in columns.items():
+                # Add source model and column nodes
+                source_model_id, source_column_id = add_model_and_column(node, col, direction)
+                
+                # Process nested relationships
+                if '+' in details:
+                    for nested_node, nested_cols in details['+'].items():
+                        for nested_col in nested_cols:
+                            # Add target model and column nodes
+                            target_model_id, target_column_id = add_model_and_column(nested_node, nested_col, direction)
+                            
+                            # Add relationship between models with solid arrow if not already added
+                            model_rel = (target_model_id, source_model_id) if direction == 'up' else (source_model_id, target_model_id)
+                            if model_rel not in model_relationships:
+                                if direction == 'up':
+                                    mermaid_lines.append(f"    {target_model_id} --> {source_model_id}")
+                                else:
+                                    mermaid_lines.append(f"    {source_model_id} --> {target_model_id}")
+                                # Style the model relationship
+                                mermaid_lines.append(f"    linkStyle {link_count} stroke:#333,stroke-width:2px")
+                                link_count += 1
+                                model_relationships.add(model_rel)
+                            
+                            # Add relationship between columns with dashed arrow
+                            if direction == 'up':
+                                # Ancestors point upward with dashed line
+                                mermaid_lines.append(f"    {target_column_id} -.-> {source_column_id}")
+                            else:
+                                # Descendants point downward with dashed line
+                                mermaid_lines.append(f"    {source_column_id} -.-> {target_column_id}")
+                            # Style the column relationship
+                            mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
+                            link_count += 1
+                            
+                            # Process nested structure recursively
+                            if nested_cols[nested_col].get('+'):
+                                process_structure({nested_node: {nested_col: nested_cols[nested_col]}}, direction, depth + 1)
+    
+    # Add invisible nodes to help with layout
+    if ancestors_structured:
+        mermaid_lines.append("    %% Invisible nodes for layout")
+        mermaid_lines.append("    AncestorsTop([\" \"])")
+        mermaid_lines.append("    style AncestorsTop fill:none,stroke:none")
+        
+    # Process ancestors first (they will appear at the top)
+    if ancestors_structured:
+        process_structure(ancestors_structured, 'up')
+    
+    # Add the central model and column nodes
+    central_model_id = f"model_{model_node}".replace('.', '_')
+    central_column_id = f"{model_node}_{column}".replace('.', '_')
+    model_label = get_model_name(model_node)
+    
+    mermaid_lines.append(f"    {central_model_id}[{model_label}]")
+    mermaid_lines.append(f"    {central_column_id}{{{column}}}")
+    mermaid_lines.append(f"    {central_model_id} -.- {central_column_id}")
+    # Style the central connection
+    mermaid_lines.append(f"    linkStyle {link_count} stroke:#f57f17,stroke-width:1px,stroke-dasharray:3")
+    link_count += 1
+    
+    mermaid_lines.append(f"    class {central_model_id} centralModel")
+    mermaid_lines.append(f"    class {central_column_id} centralColumn")
+    
+    visited_models.add(central_model_id)
+    visited_columns.add(central_column_id)
+    
+    # Add invisible nodes to help with layout
+    if descendants_structured:
+        mermaid_lines.append("    %% Invisible nodes for layout")
+        mermaid_lines.append("    DescendantsBottom([\" \"])")
+        mermaid_lines.append("    style DescendantsBottom fill:none,stroke:none")
+    
+    # Process descendants last (they will appear at the bottom)
+    if descendants_structured:
+        process_structure(descendants_structured, 'down')
+    
+    # Add layout constraints using invisible nodes
+    if ancestors_structured:
+        mermaid_lines.append("    AncestorsTop --> " + central_model_id + ":::none")
+    if descendants_structured:
+        mermaid_lines.append("    " + central_model_id + " --> DescendantsBottom:::none")
+    
+    return "\n".join(mermaid_lines)
+
 def find_model_in_lineage(lineage_data, model_name):
     """Find full node paths in lineage data that match the model name."""
     matching_nodes = []
@@ -27,6 +180,8 @@ def main():
                         help='Path to the dbt catalog.json file, default to ./target/catalog.json')
     parser.add_argument('--output-dir', default='./outputs', help='Output directory for lineage files, default to ./outputs')
     parser.add_argument('--show-ui', action='store_true', help='Show web UI for lineage visualization')
+    parser.add_argument('--output-format', choices=['json', 'mermaid'], default='json',
+                        help='Output format for lineage data. Choose between json or mermaid. Default is json.')
 
     args = parser.parse_args()
 
@@ -111,12 +266,8 @@ def main():
         print("---structured ancestors---")
         utils.pretty_print_dict(ancestors_structured)
 
-        # Save ancestors to files
-        ancestors_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_ancestors.json")
-        utils.write_dict_to_file(ancestors_structured, ancestors_file)
-
-        print("========================================")
         # Find all descendants for a specific model and column
+        print("========================================")
         print(f"Finding all descendants of {model_node}.{args.column}:")
         descendants_squashed = DbtColumnLineageExtractor.find_all_related(
             lineage_to_direct_children, model_node, args.column
@@ -130,20 +281,41 @@ def main():
         print("---structured descendants---")
         utils.pretty_print_dict(descendants_structured)
 
-        # Save descendants to files
-        descendants_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_descendants.json")
-        utils.write_dict_to_file(descendants_structured, descendants_file)
-
-        print("========================================")
-        print(
-            "You can use the structured ancestors and descendants to programmatically use the lineage, "
-            "such as for impact analysis, data tagging, etc."
-        )
-        print(
-            "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, "
-            "https://jsoncrack.com/editor to visualize the lineage"
-        )
-        print(f"Lineage outputs saved to {ancestors_file} and {descendants_file}")
+        # Save outputs based on format
+        if args.output_format == 'json':
+            # Save ancestors to files
+            ancestors_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_ancestors.json")
+            utils.write_dict_to_file(ancestors_structured, ancestors_file)
+            
+            # Save descendants to files
+            descendants_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_descendants.json")
+            utils.write_dict_to_file(descendants_structured, descendants_file)
+            
+            print("========================================")
+            print(
+                "You can use the structured ancestors and descendants to programmatically use the lineage, "
+                "such as for impact analysis, data tagging, etc."
+            )
+            print(
+                "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, "
+                "https://jsoncrack.com/editor to visualize the lineage"
+            )
+            print(f"Lineage outputs saved to {ancestors_file} and {descendants_file}")
+        else:  # mermaid format
+            # Convert to Mermaid format
+            mermaid_output = convert_to_mermaid(model_node, args.column, ancestors_structured, descendants_structured)
+            
+            # Save Mermaid output
+            mermaid_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_lineage.mmd")
+            with open(mermaid_file, 'w') as f:
+                f.write(mermaid_output)
+            
+            print("========================================")
+            print("Lineage has been converted to Mermaid format.")
+            print("You can use this output with Mermaid-compatible tools to visualize the lineage.")
+            print("For example, you can paste it into Mermaid Live Editor: https://mermaid.live")
+            print(f"Mermaid output saved to {mermaid_file}")
+        
         return 0
     except Exception as e:
         print(f"Error: {str(e)}")

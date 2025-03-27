@@ -57,7 +57,7 @@ cd examples
 
 First, generate column lineage relationships to model's direct parents and children using the `dbt_column_lineage_direct` command.
 
-To scan the whole project (takes longer):
+To scan the whole project (takes longer, but you don't need to run it again for different models if there is no model change):
 ```bash
 dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json
 ```

@@ -308,7 +308,7 @@ def main():
         except FileNotFoundError as e:
             print(f"Error: Could not find required lineage file: {e}")
             print("\nTo generate the required lineage files, please run one of the following commands first:")
-            print("\n1. To scan the whole project (takes longer):")
+            print("\n1. To scan the whole project (takes longer, To scan the whole project (takes longer, but you don't need to run it again for different models if there is no model change):")
             print("   dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json")
             print("\n2. If only interested in this model (faster):")
             print(f"   dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json --model +{args.model}+")

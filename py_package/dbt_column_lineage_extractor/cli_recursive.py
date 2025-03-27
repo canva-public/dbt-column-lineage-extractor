@@ -292,7 +292,7 @@ def main():
     parser.add_argument('--catalog', default='./target/catalog.json',
                         help='Path to the dbt catalog.json file, default to ./target/catalog.json')
     parser.add_argument('--output-dir', default='./outputs', help='Output directory for lineage files, default to ./outputs')
-    parser.add_argument('--show-ui', action='store_true', help='Show web UI for lineage visualization')
+    parser.add_argument('--no-ui', action='store_true', help='Do not automatically open the visualization in browser')
     parser.add_argument('--output-format', choices=['json', 'mermaid', 'both'], default='both',
                         help='Output format for lineage data. Choose between json, mermaid, or both. Default is both.')
 
@@ -424,15 +424,14 @@ def main():
             with open(mermaid_file, 'w') as f:
                 f.write(mermaid_output)
             
-            # Always create and open HTML viewer for Mermaid output
+            # Always create HTML viewer for Mermaid output
             viewer_file = create_html_viewer(mermaid_output, args.output_dir, model_node, args.column)
             
-            # print("========================================")
-            # print("Lineage has been converted to Mermaid format.")
             print(f"Mermaid output saved to {mermaid_file}")
             print(f"Interactive HTML viewer created at: {viewer_file}")
             
-            if args.show_ui:
+            # Open the viewer by default unless --no-ui is specified
+            if not args.no_ui:
                 print("Opening Mermaid diagram in local viewer...")
                 webbrowser.open(f"file://{os.path.abspath(viewer_file)}")
         

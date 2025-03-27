@@ -69,20 +69,49 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
         
         return model_id, column_id
     
-    def process_structure(structure, direction='up', depth=0):
+    def process_structure(structure, direction='up', parent_ids=None):
         """Process the structured lineage data recursively."""
         nonlocal link_count
+        current_level_ids = []
+        
         for node, columns in structure.items():
             for col, details in columns.items():
                 # Add source model and column nodes
                 source_model_id, source_column_id = add_model_and_column(node, col, direction)
+                current_level_ids.extend([source_model_id, source_column_id])
+                
+                # Connect to parent level if exists
+                if parent_ids:
+                    for parent_model_id, parent_column_id in zip(parent_ids[::2], parent_ids[1::2]):
+                        # Add relationship between models with solid arrow if not already added
+                        model_rel = (source_model_id, parent_model_id) if direction == 'down' else (parent_model_id, source_model_id)
+                        if model_rel not in model_relationships:
+                            if direction == 'up':
+                                mermaid_lines.append(f"    {source_model_id} --> {parent_model_id}")
+                            else:
+                                mermaid_lines.append(f"    {parent_model_id} --> {source_model_id}")
+                            # Style the model relationship
+                            mermaid_lines.append(f"    linkStyle {link_count} stroke:#333,stroke-width:2px")
+                            link_count += 1
+                            model_relationships.add(model_rel)
+                        
+                        # Add relationship between columns with dashed arrow
+                        if direction == 'up':
+                            mermaid_lines.append(f"    {source_column_id} -.-> {parent_column_id}")
+                        else:
+                            mermaid_lines.append(f"    {parent_column_id} -.-> {source_column_id}")
+                        # Style the column relationship
+                        mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
+                        link_count += 1
                 
                 # Process nested relationships
                 if '+' in details:
+                    nested_ids = []
                     for nested_node, nested_cols in details['+'].items():
                         for nested_col in nested_cols:
                             # Add target model and column nodes
                             target_model_id, target_column_id = add_model_and_column(nested_node, nested_col, direction)
+                            nested_ids.extend([target_model_id, target_column_id])
                             
                             # Add relationship between models with solid arrow if not already added
                             model_rel = (target_model_id, source_model_id) if direction == 'up' else (source_model_id, target_model_id)
@@ -98,10 +127,8 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
                             
                             # Add relationship between columns with dashed arrow
                             if direction == 'up':
-                                # Ancestors point upward with dashed line
                                 mermaid_lines.append(f"    {target_column_id} -.-> {source_column_id}")
                             else:
-                                # Descendants point downward with dashed line
                                 mermaid_lines.append(f"    {source_column_id} -.-> {target_column_id}")
                             # Style the column relationship
                             mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
@@ -109,19 +136,14 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
                             
                             # Process nested structure recursively
                             if nested_cols[nested_col].get('+'):
-                                process_structure({nested_node: {nested_col: nested_cols[nested_col]}}, direction, depth + 1)
-    
-    # Add invisible nodes to help with layout
-    if ancestors_structured:
-        mermaid_lines.append("    %% Invisible nodes for layout")
-        mermaid_lines.append("    AncestorsTop([\" \"])")
-        mermaid_lines.append("    style AncestorsTop fill:none,stroke:none")
+                                process_structure({nested_node: {nested_col: nested_cols[nested_col]}}, direction, [target_model_id, target_column_id])
+                    
+                    if nested_ids:
+                        current_level_ids.extend(nested_ids)
         
-    # Process ancestors first (they will appear at the top)
-    if ancestors_structured:
-        process_structure(ancestors_structured, 'up')
+        return current_level_ids
     
-    # Add the central model and column nodes
+    # Add the central model and column nodes first
     central_model_id = f"model_{model_node}".replace('.', '_')
     central_column_id = f"{model_node}_{column}".replace('.', '_')
     model_label = get_model_name(model_node)
@@ -139,21 +161,13 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
     visited_models.add(central_model_id)
     visited_columns.add(central_column_id)
     
-    # Add invisible nodes to help with layout
-    if descendants_structured:
-        mermaid_lines.append("    %% Invisible nodes for layout")
-        mermaid_lines.append("    DescendantsBottom([\" \"])")
-        mermaid_lines.append("    style DescendantsBottom fill:none,stroke:none")
-    
-    # Process descendants last (they will appear at the bottom)
-    if descendants_structured:
-        process_structure(descendants_structured, 'down')
-    
-    # Add layout constraints using invisible nodes
+    # Process ancestors and connect them to central node
     if ancestors_structured:
-        mermaid_lines.append("    AncestorsTop --> " + central_model_id + ":::none")
+        ancestor_ids = process_structure(ancestors_structured, 'up', [central_model_id, central_column_id])
+    
+    # Process descendants and connect them to central node
     if descendants_structured:
-        mermaid_lines.append("    " + central_model_id + " --> DescendantsBottom:::none")
+        descendant_ids = process_structure(descendants_structured, 'down', [central_model_id, central_column_id])
     
     return "\n".join(mermaid_lines)
 

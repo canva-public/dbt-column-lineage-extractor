@@ -62,7 +62,7 @@ To scan the whole project (takes longer):
 dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json
 ```
 
-If only interested in specific models (faster), you can use the `--model` parameter with support for dbt-style selectors:
+If only interested in specific models (faster), you can use the `--model +model_name+` parameter with support for dbt-style selectors:
 ```bash
 dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json --model +orders+
 ```

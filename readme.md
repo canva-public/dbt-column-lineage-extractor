@@ -55,14 +55,16 @@ cd examples
 
 ### Option 1 - Command Line Interface
 
-First, generate column lineage relationships to model's direct parents and children using the `dbt_column_lineage_direct` command, e.g.:
+First, generate column lineage relationships to model's direct parents and children using the `dbt_column_lineage_direct` command.
+
+To scan the whole project (takes longer):
 ```bash
-dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json
+dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json
 ```
 
-You can specify particular models using the `--model` parameter with support for dbt-style selectors:
+If only interested in specific models (faster), you can use the `--model` parameter with support for dbt-style selectors:
 ```bash
-dbt_column_lineage_direct --manifest ./inputs/manifest.json --catalog ./inputs/catalog.json --model +orders+
+dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json --model +orders+
 ```
 
 #### Model Selection Syntax

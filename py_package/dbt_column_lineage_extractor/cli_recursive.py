@@ -295,6 +295,7 @@ def main():
     parser.add_argument('--no-ui', action='store_true', help='Do not automatically open the visualization in browser')
     parser.add_argument('--output-format', choices=['json', 'mermaid', 'both'], default='both',
                         help='Output format for lineage data. Choose between json, mermaid, or both. Default is both.')
+    parser.add_argument('--show-details', action='store_true', help='Show detailed squashed/structured ancestors/descendants in terminal')
 
     args = parser.parse_args()
 
@@ -308,6 +309,12 @@ def main():
             lineage_to_direct_children = utils.read_dict_from_file(args.lineage_children_file)
         except FileNotFoundError as e:
             print(f"Error: Could not find required lineage file: {e}")
+            print("\nTo generate the required lineage files, please run one of the following commands first:")
+            print("\n1. To scan the whole project (takes longer):")
+            print("   dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json")
+            print("\n2. If only interested in this model (faster):")
+            print(f"   dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json --model +{args.model}+")
+            print("\nAfter running one of these commands, try this command again.")
             return 1
         except json.JSONDecodeError as e:
             print(f"Error: Invalid JSON in lineage file: {e}")
@@ -374,10 +381,11 @@ def main():
             lineage_to_direct_parents, model_node, args.column
         )
 
-        print("---squashed ancestors---")
-        utils.pretty_print_dict(ancestors_squashed)
-        print("---structured ancestors---")
-        utils.pretty_print_dict(ancestors_structured)
+        if args.show_details:
+            print("---squashed ancestors---")
+            utils.pretty_print_dict(ancestors_squashed)
+            print("---structured ancestors---")
+            utils.pretty_print_dict(ancestors_structured)
 
         # Find all descendants for a specific model and column
         print("========================================")
@@ -389,10 +397,11 @@ def main():
             lineage_to_direct_children, model_node, args.column
         )
 
-        print("---squashed descendants---")
-        utils.pretty_print_dict(descendants_squashed)
-        print("---structured descendants---")
-        utils.pretty_print_dict(descendants_structured)
+        if args.show_details:
+            print("---squashed descendants---")
+            utils.pretty_print_dict(descendants_squashed)
+            print("---structured descendants---")
+            utils.pretty_print_dict(descendants_structured)
 
         # Save outputs based on format
         if args.output_format in ['json', 'both']:

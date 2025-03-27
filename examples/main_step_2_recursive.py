@@ -52,10 +52,10 @@ print("---structured descendants---")
 utils.pretty_print_dict(descendants_structured)
 
 # %%
-print("========================================")
-print(
-    "You can use the structured ancestors and descendants to programmatically use the lineage, such as for impact analysis, data tagging, etc."
-)
-print(
-    "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, https://jsoncrack.com/editor to visualize the lineage"
-)
+# print("========================================")
+# print(
+#     "You can use the structured ancestors and descendants to programmatically use the lineage, such as for impact analysis, data tagging, etc."
+# )
+# print(
+#     "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, https://jsoncrack.com/editor to visualize the lineage"
+# )

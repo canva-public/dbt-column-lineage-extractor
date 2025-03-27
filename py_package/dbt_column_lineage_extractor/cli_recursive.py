@@ -293,9 +293,8 @@ def main():
                         help='Path to the dbt catalog.json file, default to ./target/catalog.json')
     parser.add_argument('--output-dir', default='./outputs', help='Output directory for lineage files, default to ./outputs')
     parser.add_argument('--show-ui', action='store_true', help='Show web UI for lineage visualization')
-    parser.add_argument('--output-format', choices=['json', 'mermaid'], default='json',
-                        help='Output format for lineage data. Choose between json or mermaid. Default is json.')
-    parser.add_argument('--view', action='store_true', help='Open the Mermaid diagram in a local viewer')
+    parser.add_argument('--output-format', choices=['json', 'mermaid', 'both'], default='both',
+                        help='Output format for lineage data. Choose between json, mermaid, or both. Default is both.')
 
     args = parser.parse_args()
 
@@ -396,7 +395,7 @@ def main():
         utils.pretty_print_dict(descendants_structured)
 
         # Save outputs based on format
-        if args.output_format == 'json':
+        if args.output_format in ['json', 'both']:
             # Save ancestors to files
             ancestors_file = os.path.join(args.output_dir, f"{model_node}_{args.column}_ancestors.json")
             utils.write_dict_to_file(ancestors_structured, ancestors_file)
@@ -406,16 +405,17 @@ def main():
             utils.write_dict_to_file(descendants_structured, descendants_file)
             
             print("========================================")
-            print(
-                "You can use the structured ancestors and descendants to programmatically use the lineage, "
-                "such as for impact analysis, data tagging, etc."
-            )
-            print(
-                "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, "
-                "https://jsoncrack.com/editor to visualize the lineage"
-            )
+            # print(
+            #     "You can use the structured ancestors and descendants to programmatically use the lineage, "
+            #     "such as for impact analysis, data tagging, etc."
+            # )
+            # print(
+            #     "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, "
+            #     "https://jsoncrack.com/editor to visualize the lineage"
+            # )
             print(f"Lineage outputs saved to {ancestors_file} and {descendants_file}")
-        else:  # mermaid format
+
+        if args.output_format in ['mermaid', 'both']:
             # Convert to Mermaid format
             mermaid_output = convert_to_mermaid(model_node, args.column, ancestors_structured, descendants_structured)
             
@@ -424,18 +424,17 @@ def main():
             with open(mermaid_file, 'w') as f:
                 f.write(mermaid_output)
             
-            print("========================================")
-            print("Lineage has been converted to Mermaid format.")
+            # Always create and open HTML viewer for Mermaid output
+            viewer_file = create_html_viewer(mermaid_output, args.output_dir, model_node, args.column)
             
-            if args.view:
-                # Create and open HTML viewer
-                viewer_file = create_html_viewer(mermaid_output, args.output_dir, model_node, args.column)
-                print(f"Opening Mermaid diagram in local viewer: {viewer_file}")
+            # print("========================================")
+            # print("Lineage has been converted to Mermaid format.")
+            print(f"Mermaid output saved to {mermaid_file}")
+            print(f"Interactive HTML viewer created at: {viewer_file}")
+            
+            if args.show_ui:
+                print("Opening Mermaid diagram in local viewer...")
                 webbrowser.open(f"file://{os.path.abspath(viewer_file)}")
-            else:
-                print("You can use this output with Mermaid-compatible tools to visualize the lineage.")
-                print("For example, you can paste it into Mermaid Live Editor: https://mermaid.live")
-                print(f"Mermaid output saved to {mermaid_file}")
         
         return 0
     except Exception as e:

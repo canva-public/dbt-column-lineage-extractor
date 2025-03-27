@@ -1,8 +1,107 @@
 import argparse
 import os
 import json
+import webbrowser
+from pathlib import Path
 import dbt_column_lineage_extractor.utils as utils
 from dbt_column_lineage_extractor import DbtColumnLineageExtractor
+
+def create_html_viewer(mermaid_code, output_dir, model_node, column):
+    """Create an HTML file with Mermaid viewer."""
+    html_content = f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DBT Column Lineage: {model_node}.{column}</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({{
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {{
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: 'basis'
+            }}
+        }});
+    </script>
+    <style>
+        body {{
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }}
+        .mermaid {{
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }}
+        .controls {{
+            margin-bottom: 20px;
+        }}
+        button {{
+            padding: 8px 16px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }}
+        button:hover {{
+            background-color: #45a049;
+        }}
+        .title {{
+            margin-bottom: 20px;
+            color: #333;
+        }}
+    </style>
+</head>
+<body>
+    <h1 class="title">Column Lineage: {model_node}.{column}</h1>
+    <div class="controls">
+        <button onclick="zoomIn()">Zoom In</button>
+        <button onclick="zoomOut()">Zoom Out</button>
+        <button onclick="resetZoom()">Reset Zoom</button>
+    </div>
+    <div class="mermaid">
+{mermaid_code}
+    </div>
+    <script>
+        let scale = 1;
+        const diagram = document.querySelector('.mermaid');
+        
+        function zoomIn() {{
+            scale *= 1.2;
+            diagram.style.transform = `scale(${{scale}})`;
+            diagram.style.transformOrigin = 'top left';
+        }}
+        
+        function zoomOut() {{
+            scale *= 0.8;
+            diagram.style.transform = `scale(${{scale}})`;
+            diagram.style.transformOrigin = 'top left';
+        }}
+        
+        function resetZoom() {{
+            scale = 1;
+            diagram.style.transform = `scale(${{scale}})`;
+            diagram.style.transformOrigin = 'top left';
+        }}
+    </script>
+</body>
+</html>
+"""
+    # Create a filename based on model and column
+    safe_model_name = model_node.replace('.', '_').replace('/', '_')
+    safe_column_name = column.replace('.', '_').replace('/', '_')
+    viewer_file = os.path.join(output_dir, f"lineage_viewer_{safe_model_name}_{safe_column_name}.html")
+    
+    with open(viewer_file, 'w') as f:
+        f.write(html_content)
+    return viewer_file
 
 def convert_to_mermaid(model_node, column, ancestors_structured, descendants_structured):
     """Convert lineage data to Mermaid flowchart format."""
@@ -196,6 +295,7 @@ def main():
     parser.add_argument('--show-ui', action='store_true', help='Show web UI for lineage visualization')
     parser.add_argument('--output-format', choices=['json', 'mermaid'], default='json',
                         help='Output format for lineage data. Choose between json or mermaid. Default is json.')
+    parser.add_argument('--view', action='store_true', help='Open the Mermaid diagram in a local viewer')
 
     args = parser.parse_args()
 
@@ -326,9 +426,16 @@ def main():
             
             print("========================================")
             print("Lineage has been converted to Mermaid format.")
-            print("You can use this output with Mermaid-compatible tools to visualize the lineage.")
-            print("For example, you can paste it into Mermaid Live Editor: https://mermaid.live")
-            print(f"Mermaid output saved to {mermaid_file}")
+            
+            if args.view:
+                # Create and open HTML viewer
+                viewer_file = create_html_viewer(mermaid_output, args.output_dir, model_node, args.column)
+                print(f"Opening Mermaid diagram in local viewer: {viewer_file}")
+                webbrowser.open(f"file://{os.path.abspath(viewer_file)}")
+            else:
+                print("You can use this output with Mermaid-compatible tools to visualize the lineage.")
+                print("For example, you can paste it into Mermaid Live Editor: https://mermaid.live")
+                print(f"Mermaid output saved to {mermaid_file}")
         
         return 0
     except Exception as e:

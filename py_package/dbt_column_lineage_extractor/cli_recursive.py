@@ -270,27 +270,25 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
     
     return "\n".join(mermaid_lines)
 
-def find_model_in_lineage(lineage_data, model_name):
-    """Find full node paths in lineage data that match the model name."""
-    matching_nodes = []
+def find_potential_matches(lineage_data, model_name):
+    """Find potential matches for a model name in lineage data."""
+    matches = []
+    search_term = model_name.lower()
     for node in lineage_data.keys():
-        # Check if the node ends with the model name
-        if node.split('.')[-1] == model_name:
-            matching_nodes.append(node)
-    return matching_nodes
+        node_lower = node.lower()
+        # Check if the node contains the search term
+        if search_term in node_lower:
+            matches.append(node)
+    return matches
 
 def main():
     parser = argparse.ArgumentParser(description="Recursive DBT Column Lineage Extractor CLI")
-    parser.add_argument('--model', required=True, help='Model to find lineage for, can be short name (e.g. "customers") or full node path (e.g. "model.jaffle_shop.customers")')
+    parser.add_argument('--model', required=True, help='Model to find lineage for, must be full node path (e.g. "model.jaffle_shop.customers")')
     parser.add_argument('--column', required=True, help='Column name to find lineage for, e.g. order_id')
     parser.add_argument('--lineage-parents-file', default='./outputs/lineage_to_direct_parents.json',
                         help='Path to the lineage_to_direct_parents.json file, default to ./outputs/lineage_to_direct_parents.json')
     parser.add_argument('--lineage-children-file', default='./outputs/lineage_to_direct_children.json',
                         help='Path to the lineage_to_direct_children.json file, default to ./outputs/lineage_to_direct_children.json')
-    parser.add_argument('--manifest', default='./target/manifest.json', 
-                        help='Path to the dbt manifest.json file, default to ./target/manifest.json')
-    parser.add_argument('--catalog', default='./target/catalog.json',
-                        help='Path to the dbt catalog.json file, default to ./target/catalog.json')
     parser.add_argument('--output-dir', default='./outputs', help='Output directory for lineage files, default to ./outputs')
     parser.add_argument('--no-ui', action='store_true', help='Do not automatically open the visualization in browser')
     parser.add_argument('--output-format', choices=['json', 'mermaid', 'both'], default='both',
@@ -320,58 +318,30 @@ def main():
             print(f"Error: Invalid JSON in lineage file: {e}")
             return 1
 
-        # Resolve model name to full node path if needed
+        # Use model name as provided - must be full node path
         model_node = args.model
-        # Check if this is not already a full node path
-        if not model_node.startswith(('model.', 'source.')):
-            # First try to find the model in lineage files
-            matching_nodes_from_lineage = find_model_in_lineage(lineage_to_direct_parents, model_node)
-            
-            if matching_nodes_from_lineage:
-                if len(matching_nodes_from_lineage) > 1:
-                    print(f"Warning: Multiple models match '{model_node}' in lineage files. Using the first match: {matching_nodes_from_lineage[0]}")
-                model_node = matching_nodes_from_lineage[0]
-                print(f"Resolved model name '{args.model}' to full node path from lineage file: {model_node}")
-            else:
-                # Try alternate lineage file if first one didn't have matches
-                matching_nodes_from_lineage = find_model_in_lineage(lineage_to_direct_children, model_node)
-                if matching_nodes_from_lineage:
-                    if len(matching_nodes_from_lineage) > 1:
-                        print(f"Warning: Multiple models match '{model_node}' in lineage files. Using the first match: {matching_nodes_from_lineage[0]}")
-                    model_node = matching_nodes_from_lineage[0]
-                    print(f"Resolved model name '{args.model}' to full node path from lineage file: {model_node}")
-                else:
-                    # If not found in lineage files, try to use manifest if available
-                    try:
-                        # First check if manifest and catalog files exist
-                        if not os.path.exists(args.manifest):
-                            print(f"Warning: Manifest file not found at '{args.manifest}'. Cannot resolve model name.")
-                            print("Proceeding with the original model name. If this is incorrect, please provide a full node path (e.g., model.package.model_name)")
-                        elif not os.path.exists(args.catalog):
-                            print(f"Warning: Catalog file not found at '{args.catalog}'. Cannot resolve model name.")
-                            print("Proceeding with the original model name. If this is incorrect, please provide a full node path (e.g., model.package.model_name)")
-                        else:
-                            extractor = DbtColumnLineageExtractor(
-                                manifest_path=args.manifest,
-                                catalog_path=args.catalog
-                            )
-                            # Try to resolve the model name
-                            matching_nodes = extractor._resolve_node_by_name(model_node)
-                            if matching_nodes:
-                                if len(matching_nodes) > 1:
-                                    print(f"Warning: Multiple models match '{model_node}'. Using the first match: {matching_nodes[0]}")
-                                model_node = matching_nodes[0]
-                                print(f"Resolved model name '{args.model}' to full node path: {model_node}")
-                            else:
-                                print(f"Warning: Could not find any model with name '{model_node}' in the manifest file.")
-                                print("Proceeding with the original model name. If this is incorrect, please provide a full node path (e.g., model.package.model_name)")
-                    except Exception as e:
-                        print(f"Warning: Error when trying to resolve model name: {e}")
-                        print("Proceeding with the original model name. If this is incorrect, please provide a full node path (e.g., model.package.model_name)")
 
         # Check if model exists in lineage files
         if model_node not in lineage_to_direct_parents and model_node not in lineage_to_direct_children:
-            print(f"Warning: Model '{model_node}' not found in lineage files. Results may be empty or incomplete.")
+            # Search for potential matches in both lineage files
+            parent_matches = find_potential_matches(lineage_to_direct_parents, model_node)
+            child_matches = find_potential_matches(lineage_to_direct_children, model_node)
+            
+            # Combine unique matches
+            all_matches = list(set(parent_matches + child_matches))
+            
+            if all_matches:
+                if len(all_matches) > 1:
+                    print("\nError: Multiple potential matches found. Please use one of the following full node paths:")
+                    for match in sorted(all_matches):
+                        print(f"  - {match}")
+                    return 1
+                else:
+                    # Single match found - use it automatically
+                    model_node = all_matches[0]
+                    print(f"Using model: {model_node}")
+            else:
+                print(f"No matches found for '{model_node}'. Results may be empty or incomplete.")
 
         print("========================================")
         # Find all ancestors for a specific model and column
@@ -417,14 +387,6 @@ def main():
             utils.write_dict_to_file(descendants_structured, descendants_file)
             
             print("========================================")
-            # print(
-            #     "You can use the structured ancestors and descendants to programmatically use the lineage, "
-            #     "such as for impact analysis, data tagging, etc."
-            # )
-            # print(
-            #     "Or, you can copy the json outputs to tools like https://github.com/AykutSarac/jsoncrack.com, "
-            #     "https://jsoncrack.com/editor to visualize the lineage"
-            # )
             print(f"Lineage outputs saved to {ancestors_file} and {descendants_file}")
 
         if args.output_format in ['mermaid', 'both']:
@@ -440,7 +402,7 @@ def main():
             viewer_file = create_html_viewer(mermaid_output, args.output_dir, model_node, args.column)
             
             print(f"Mermaid output saved to {mermaid_file}")
-            print(f"Interactive HTML viewer created at: {viewer_file}")
+            print(f"HTML viewer created at: {viewer_file}")
             
             # Open the viewer by default unless --no-ui is specified
             if not args.no_ui:

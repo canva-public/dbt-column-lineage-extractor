@@ -16,7 +16,7 @@ The DBT Column Lineage Extractor is a lightweight Python-based tool for extracti
 
 - Extract column level lineage for specified model columns, including direct and recursive relationships.
 - Output results in a human-readable JSON format for programmatic integration (e.g., data impact analysis, data tagging).
-- Interactive visualization of column lineage using Mermaid diagrams with browser-based viewing.
+- Visualization of column lineage using Mermaid diagrams
 - Support for dbt-style model selection syntax, allowing easy selection of models and sources using familiar patterns.
 
 
@@ -78,7 +78,7 @@ dbt_column_lineage_recursive --model model.jaffle_shop.stg_orders --column order
 
 This will:
 1. Generate a detailed lineage analysis, outputting the structured lineaged in json and mermaid diagram format.
-2. Create an interactive Mermaid diagram visualization in html.
+2. Create a Mermaid diagram visualization in html.
 
 See more usage guides using `dbt_column_lineage_direct -h` and `dbt_column_lineage_recursive -h`.
 
@@ -87,8 +87,7 @@ See the [readme file](./examples/readme.md) in the `examples` directory for more
 
 ## Outputs
 
-### 1. Interactive Mermaid Diagrams for visualization
-The tool automatically generates an interactive visualization using Mermaid diagrams
+### 1. Mermaid Diagrams for visualization
 
 Example Mermaid visualization:
 

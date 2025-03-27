@@ -97,7 +97,7 @@ def create_html_viewer(mermaid_code, output_dir, model_node, column):
     # Create a filename based on model and column
     safe_model_name = model_node.replace('.', '_').replace('/', '_')
     safe_column_name = column.replace('.', '_').replace('/', '_')
-    viewer_file = os.path.join(output_dir, f"lineage_viewer_{safe_model_name}_{safe_column_name}.html")
+    viewer_file = os.path.join(output_dir, f"{safe_model_name}__{safe_column_name}.html")
     
     with open(viewer_file, 'w') as f:
         f.write(html_content)

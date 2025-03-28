@@ -1,5 +1,27 @@
 import json
 import os
+import logging
+import sys
+
+def setup_logging(level=logging.INFO):
+    """
+    Set up logging configuration.
+    Args:
+        level: Logging level (default: INFO)
+    Returns:
+        Logger object
+    """
+    logger = logging.getLogger("dbt_column_lineage")
+    
+    if not logger.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter('%(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        
+    logger.setLevel(level)
+    logger.propagate = False
+    return logger
 
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
@@ -10,7 +32,26 @@ def read_json(file_path):
 
 
 def pretty_print_dict(dict_to_print):
-    print(json.dumps(dict_to_print, indent=4))
+    """
+    Pretty print a dictionary as JSON.
+    Logs the formatted JSON and also prints it directly for test compatibility.
+    
+    Args:
+        dict_to_print: Dictionary to print
+    
+    Returns:
+        Formatted JSON string
+    """
+    formatted_json = json.dumps(dict_to_print, indent=4)
+    
+    # Log using the logger
+    logger = setup_logging()
+    logger.info(formatted_json)
+    
+    # Also print directly for test compatibility
+    print(formatted_json)
+    
+    return formatted_json
 
 
 def write_dict_to_file(dict_to_write, file_path):

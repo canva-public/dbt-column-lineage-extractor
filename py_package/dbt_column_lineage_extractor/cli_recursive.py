@@ -49,8 +49,17 @@ def main():
         action="store_true",
         help="Show detailed squashed/structured ancestors/descendants in terminal",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging",
+    )
 
     args = parser.parse_args()
+    
+    # Set up logging
+    log_level = utils.logging.DEBUG if args.verbose else utils.logging.INFO
+    logger = utils.setup_logging(level=log_level)
 
     try:
         # Create output directory if it doesn't exist
@@ -61,24 +70,24 @@ def main():
             lineage_to_direct_parents = utils.read_dict_from_file(args.lineage_parents_file)
             lineage_to_direct_children = utils.read_dict_from_file(args.lineage_children_file)
         except FileNotFoundError as e:
-            print(f"Error: Could not find required lineage file: {e}")
-            print(
+            logger.error(f"Error: Could not find required lineage file: {e}")
+            logger.info(
                 "\nTo generate the required lineage files, please run one of the following commands first:"
             )
-            print(
+            logger.info(
                 "\n1. To scan the whole project (takes longer, but you don't need to run it again for different models if there is no model change):"
             )
-            print(
+            logger.info(
                 "   dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json"
             )
-            print("\n2. If only interested in this model (faster):")
-            print(
+            logger.info("\n2. If only interested in this model (faster):")
+            logger.info(
                 f"   dbt_column_lineage_direct --manifest path/to/manifest.json --catalog path/to/catalog.json --model +{args.model}+"
             )
-            print("\nAfter running one of these commands, try this command again.")
+            logger.info("\nAfter running one of these commands, try this command again.")
             return 1
         except json.JSONDecodeError as e:
-            print(f"Error: Invalid JSON in lineage file: {e}")
+            logger.error(f"Error: Invalid JSON in lineage file: {e}")
             return 1
 
         # Use model name as provided - must be full node path
@@ -98,22 +107,22 @@ def main():
 
             if all_matches:
                 if len(all_matches) > 1:
-                    print(
+                    logger.error(
                         "\nError: Multiple potential matches found. Please use one of the following full node paths:"
                     )
                     for match in sorted(all_matches):
-                        print(f"  - {match}")
+                        logger.info(f"  - {match}")
                     return 1
                 else:
                     # Single match found - use it automatically
                     model_node = all_matches[0]
-                    print(f"Using model: {model_node}")
+                    logger.info(f"Using model: {model_node}")
             else:
-                print(f"No matches found for '{model_node}'. Results may be empty or incomplete.")
+                logger.warning(f"No matches found for '{model_node}'. Results may be empty or incomplete.")
 
-        print("========================================")
+        logger.info("========================================")
         # Find all ancestors for a specific model and column
-        print(f"Finding all ancestors of {model_node}.{args.column}:")
+        logger.info(f"Finding all ancestors of {model_node}.{args.column}:")
         ancestors_squashed = DbtColumnLineageExtractor.find_all_related(
             lineage_to_direct_parents, model_node, args.column
         )
@@ -122,14 +131,14 @@ def main():
         )
 
         if args.show_details:
-            print("---squashed ancestors---")
+            logger.info("---squashed ancestors---")
             utils.pretty_print_dict(ancestors_squashed)
-            print("---structured ancestors---")
+            logger.info("---structured ancestors---")
             utils.pretty_print_dict(ancestors_structured)
 
         # Find all descendants for a specific model and column
-        print("========================================")
-        print(f"Finding all descendants of {model_node}.{args.column}:")
+        logger.info("========================================")
+        logger.info(f"Finding all descendants of {model_node}.{args.column}:")
         descendants_squashed = DbtColumnLineageExtractor.find_all_related(
             lineage_to_direct_children, model_node, args.column
         )
@@ -138,9 +147,9 @@ def main():
         )
 
         if args.show_details:
-            print("---squashed descendants---")
+            logger.info("---squashed descendants---")
             utils.pretty_print_dict(descendants_squashed)
-            print("---structured descendants---")
+            logger.info("---structured descendants---")
             utils.pretty_print_dict(descendants_structured)
 
         # Save outputs based on format
@@ -160,8 +169,8 @@ def main():
             )
             utils.write_dict_to_file(descendants_structured, descendants_file)
 
-            print("========================================")
-            print(f"Lineage outputs saved to {ancestors_file} and {descendants_file}")
+            logger.info("========================================")
+            logger.info(f"Lineage outputs saved to {ancestors_file} and {descendants_file}")
 
         if args.output_format in ["mermaid", "both"]:
             # Convert to Mermaid format
@@ -179,24 +188,23 @@ def main():
                 mermaid_output, args.output_dir, model_node, args.column
             )
 
-            print(f"Mermaid output saved to {mermaid_file}")
-            print(f"HTML viewer created at: {viewer_file}")
+            logger.info(f"Mermaid output saved to {mermaid_file}")
+            logger.info(f"HTML viewer created at: {viewer_file}")
 
             # Open the viewer by default unless --no-ui is specified
             if not args.no_ui:
-                print("Opening Mermaid diagram in local viewer...")
+                logger.info("Opening Mermaid diagram in local viewer...")
                 webbrowser.open(f"file://{os.path.abspath(viewer_file)}")
 
         return 0
     except Exception as e:
-        print(f"Error: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error(f"Error: {str(e)}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
     import sys
-
     sys.exit(main())

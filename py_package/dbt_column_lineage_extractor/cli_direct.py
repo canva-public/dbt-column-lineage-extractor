@@ -49,8 +49,17 @@ def main():
         action="store_true",
         help="Continue processing even if some models fail",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging",
+    )
 
     args = parser.parse_args()
+    
+    # Set up logging
+    log_level = utils.logging.DEBUG if args.verbose else utils.logging.INFO
+    logger = utils.setup_logging(level=log_level)
 
     try:
         selected_models = args.model
@@ -60,7 +69,7 @@ def main():
                 if not isinstance(selected_models, list):
                     raise ValueError("The JSON file must contain a list of model names")
             except Exception as e:
-                print(f"Error reading model list from JSON file: {e}")
+                logger.error(f"Error reading model list from JSON file: {e}")
                 return 1
 
         extractor = DbtColumnLineageExtractor(
@@ -70,13 +79,13 @@ def main():
             dialect=args.dialect,
         )
 
-        print(f"Processing {len(extractor.selected_models)} models after selector expansion")
+        logger.info(f"Processing {len(extractor.selected_models)} models after selector expansion")
 
         try:
             lineage_map = extractor.build_lineage_map()
 
             if not lineage_map:
-                print("Warning: No valid lineage was generated. Check for errors above.")
+                logger.warning("Warning: No valid lineage was generated. Check for errors above.")
                 if not args.continue_on_error:
                     return 1
 
@@ -97,20 +106,20 @@ def main():
                 lineage_to_direct_children, f"{args.output_dir}/lineage_to_direct_children.json"
             )
 
-            print("Lineage extraction complete. Output files written to output directory.")
+            logger.info("Lineage extraction complete. Output files written to output directory.")
             return 0
 
         except Exception as e:
-            print(f"Error during lineage extraction: {str(e)}")
+            logger.error(f"Error during lineage extraction: {str(e)}")
             if not args.continue_on_error:
                 raise
             return 1
 
     except Exception as e:
-        print(f"Error: {str(e)}")
-        import traceback
-
-        traceback.print_exc()
+        logger.error(f"Error: {str(e)}")
+        if args.verbose:
+            import traceback
+            traceback.print_exc()
         return 1
 
 

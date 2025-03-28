@@ -2,10 +2,15 @@ import warnings
 from sqlglot.lineage import lineage, maybe_parse, SqlglotError, exp
 from . import utils
 import re
+import sqlglot
 
 
 class DbtColumnLineageExtractor:
     def __init__(self, manifest_path, catalog_path, selected_models=[], dialect="snowflake"):
+        # Set up logging
+        self.logger = utils.setup_logging()
+        
+        # Read manifest and catalog files
         self.manifest = utils.read_json(manifest_path)
         self.catalog = utils.read_json(catalog_path)
         self.schema_dict = self._generate_schema_dict_from_catalog()
@@ -16,15 +21,17 @@ class DbtColumnLineageExtractor:
         self.parent_map = self.manifest.get("parent_map", {})
         self.child_map = self.manifest.get("child_map", {})
 
+        # Process selected models
+        self.selected_models = []
+        
         if not selected_models:
-            # only select models from manifest nodes
+            # If no models specified, use all models in the manifest
             self.selected_models = [
-                x
-                for x in self.manifest["nodes"].keys()
-                if self.manifest["nodes"][x]["resource_type"] == "model"
+                node for node in self.manifest["nodes"].keys() 
+                if self.manifest["nodes"][node].get("resource_type") == "model"
             ]
         else:
-            # Parse dbt-style selectors
+            # Process selectors to get models
             self.selected_models = self._parse_selectors(selected_models)
 
     def _parse_selectors(self, selectors):
@@ -380,23 +387,14 @@ class DbtColumnLineageExtractor:
 
     def _extract_lineage_for_model(self, model_sql, schema, model_node, selected_columns=[]):
         lineage_map = {}
+
+        # Get columns if none provided
         if not selected_columns:
             try:
-                if not model_sql or model_sql.strip() == "":
-                    warnings.warn(f"Empty SQL for model {model_node}, skipping SQL parsing")
-                    return {}
-
-                parsed_sql = maybe_parse(model_sql, dialect=self.dialect)
-                if not parsed_sql:
-                    warnings.warn(
-                        f"Failed to parse SQL for model {model_node}, SQL might be invalid or empty"
-                    )
-                    return {}
-
+                sql = sqlglot.parse_one(model_sql, dialect=self.dialect)
                 selected_columns = [
-                    column.name if isinstance(column, exp.Column) else column.alias
-                    for select in parsed_sql.find_all(exp.Select)
-                    for column in select.expressions
+                    column.alias_or_name.lower()
+                    for column in sql.select.expressions.expressions
                     if isinstance(column, (exp.Column, exp.Alias))
                 ]
             except Exception as e:
@@ -408,10 +406,10 @@ class DbtColumnLineageExtractor:
                 lineage_node = lineage(column_name, model_sql, schema=schema, dialect=self.dialect)
                 lineage_map[column_name] = lineage_node
             except SqlglotError as e:
-                print(f"Error processing model {model_node}, column {column_name}: {e}")
+                self.logger.error(f"Error processing model {model_node}, column {column_name}: {e}")
                 lineage_map[column_name] = []
             except Exception as e:
-                print(f"Unexpected error processing model {model_node}, column {column_name}: {e}")
+                self.logger.error(f"Unexpected error processing model {model_node}, column {column_name}: {e}")
                 lineage_map[column_name] = []
 
         return lineage_map
@@ -428,20 +426,20 @@ class DbtColumnLineageExtractor:
                 continue
 
             processed_count += 1
-            print(f"{processed_count}/{total_models} Processing model {model_node}")
+            self.logger.info(f"{processed_count}/{total_models} Processing model {model_node}")
 
             try:
                 if model_info["path"].endswith(".py"):
-                    print(f"Skipping column lineage detection for Python model {model_node}")
+                    self.logger.info(f"Skipping column lineage detection for Python model {model_node}")
                     continue
                 if model_info["resource_type"] != "model":
-                    print(
+                    self.logger.info(
                         f"Skipping column lineage detection for {model_node} as it's not a model but a {model_info['resource_type']}"
                     )
                     continue
 
                 if "compiled_code" not in model_info or not model_info["compiled_code"]:
-                    print(f"Skipping {model_node} as it has no compiled SQL code")
+                    self.logger.info(f"Skipping {model_node} as it has no compiled SQL code")
                     continue
 
                 parent_catalog = self._get_parent_nodes_catalog(model_info)
@@ -459,12 +457,12 @@ class DbtColumnLineageExtractor:
                     lineage_map[model_node] = model_lineage
             except Exception as e:
                 error_count += 1
-                print(f"Error processing model {model_node}: {str(e)}")
-                print(f"Continuing with next model...")
+                self.logger.error(f"Error processing model {model_node}: {str(e)}")
+                self.logger.info(f"Continuing with next model...")
                 continue
 
         if error_count > 0:
-            print(f"Completed with {error_count} errors out of {processed_count} models processed")
+            self.logger.info(f"Completed with {error_count} errors out of {processed_count} models processed")
         return lineage_map
 
     def get_dbt_node_from_sqlglot_table_node(self, node):

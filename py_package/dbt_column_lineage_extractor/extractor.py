@@ -9,7 +9,7 @@ class DbtColumnLineageExtractor:
     def __init__(self, manifest_path, catalog_path, selected_models=[], dialect="snowflake"):
         # Set up logging
         self.logger = utils.setup_logging()
-        
+
         # Read manifest and catalog files
         self.manifest = utils.read_json(manifest_path)
         self.catalog = utils.read_json(catalog_path)
@@ -23,11 +23,12 @@ class DbtColumnLineageExtractor:
 
         # Process selected models
         self.selected_models = []
-        
+
         if not selected_models:
             # If no models specified, use all models in the manifest
             self.selected_models = [
-                node for node in self.manifest["nodes"].keys() 
+                node
+                for node in self.manifest["nodes"].keys()
                 if self.manifest["nodes"][node].get("resource_type") == "model"
             ]
         else:
@@ -409,7 +410,9 @@ class DbtColumnLineageExtractor:
                 self.logger.error(f"Error processing model {model_node}, column {column_name}: {e}")
                 lineage_map[column_name] = []
             except Exception as e:
-                self.logger.error(f"Unexpected error processing model {model_node}, column {column_name}: {e}")
+                self.logger.error(
+                    f"Unexpected error processing model {model_node}, column {column_name}: {e}"
+                )
                 lineage_map[column_name] = []
 
         return lineage_map
@@ -430,7 +433,9 @@ class DbtColumnLineageExtractor:
 
             try:
                 if model_info["path"].endswith(".py"):
-                    self.logger.info(f"Skipping column lineage detection for Python model {model_node}")
+                    self.logger.info(
+                        f"Skipping column lineage detection for Python model {model_node}"
+                    )
                     continue
                 if model_info["resource_type"] != "model":
                     self.logger.info(
@@ -462,7 +467,9 @@ class DbtColumnLineageExtractor:
                 continue
 
         if error_count > 0:
-            self.logger.info(f"Completed with {error_count} errors out of {processed_count} models processed")
+            self.logger.info(
+                f"Completed with {error_count} errors out of {processed_count} models processed"
+            )
         return lineage_map
 
     def get_dbt_node_from_sqlglot_table_node(self, node):

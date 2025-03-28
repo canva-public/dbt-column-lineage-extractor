@@ -182,7 +182,9 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
                     for parent_model_id, parent_column_id in zip(parent_ids[::2], parent_ids[1::2]):
                         # Add relationship between models with solid arrow if not already added
                         model_rel = (source_model_id, parent_model_id) if direction == 'down' else (parent_model_id, source_model_id)
-                        if model_rel not in model_relationships:
+                        
+                        # Skip self-references (models pointing to themselves)
+                        if source_model_id != parent_model_id and model_rel not in model_relationships:
                             if direction == 'up':
                                 mermaid_lines.append(f"    {source_model_id} --> {parent_model_id}")
                             else:
@@ -193,13 +195,15 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
                             model_relationships.add(model_rel)
                         
                         # Add relationship between columns with dashed arrow
-                        if direction == 'up':
-                            mermaid_lines.append(f"    {source_column_id} -.-> {parent_column_id}")
-                        else:
-                            mermaid_lines.append(f"    {parent_column_id} -.-> {source_column_id}")
-                        # Style the column relationship
-                        mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
-                        link_count += 1
+                        # Skip self-references (columns in the same model pointing to themselves)
+                        if not (source_model_id == parent_model_id and source_column_id == parent_column_id):
+                            if direction == 'up':
+                                mermaid_lines.append(f"    {source_column_id} -.-> {parent_column_id}")
+                            else:
+                                mermaid_lines.append(f"    {parent_column_id} -.-> {source_column_id}")
+                            # Style the column relationship
+                            mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
+                            link_count += 1
                 
                 # Process nested relationships
                 if '+' in details:
@@ -212,7 +216,9 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
                             
                             # Add relationship between models with solid arrow if not already added
                             model_rel = (target_model_id, source_model_id) if direction == 'up' else (source_model_id, target_model_id)
-                            if model_rel not in model_relationships:
+                            
+                            # Skip self-references (models pointing to themselves)
+                            if target_model_id != source_model_id and model_rel not in model_relationships:
                                 if direction == 'up':
                                     mermaid_lines.append(f"    {target_model_id} --> {source_model_id}")
                                 else:
@@ -223,13 +229,15 @@ def convert_to_mermaid(model_node, column, ancestors_structured, descendants_str
                                 model_relationships.add(model_rel)
                             
                             # Add relationship between columns with dashed arrow
-                            if direction == 'up':
-                                mermaid_lines.append(f"    {target_column_id} -.-> {source_column_id}")
-                            else:
-                                mermaid_lines.append(f"    {source_column_id} -.-> {target_column_id}")
-                            # Style the column relationship
-                            mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
-                            link_count += 1
+                            # Skip self-references (columns in the same model pointing to themselves)
+                            if not (target_model_id == source_model_id and target_column_id == source_column_id):
+                                if direction == 'up':
+                                    mermaid_lines.append(f"    {target_column_id} -.-> {source_column_id}")
+                                else:
+                                    mermaid_lines.append(f"    {source_column_id} -.-> {target_column_id}")
+                                # Style the column relationship
+                                mermaid_lines.append(f"    linkStyle {link_count} stroke:#666,stroke-width:1.5px")
+                                link_count += 1
                             
                             # Process nested structure recursively
                             if nested_cols[nested_col].get('+'):

@@ -49,17 +49,11 @@ def main():
         action="store_true",
         help="Continue processing even if some models fail",
     )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging",
-    )
 
     args = parser.parse_args()
-    
+
     # Set up logging
-    log_level = utils.logging.DEBUG if args.verbose else utils.logging.INFO
-    logger = utils.setup_logging(level=log_level)
+    logger = utils.setup_logging()
 
     try:
         selected_models = args.model
@@ -117,9 +111,9 @@ def main():
 
     except Exception as e:
         logger.error(f"Error: {str(e)}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        import traceback
+
+        traceback.print_exc()
         return 1
 
 

@@ -4,11 +4,9 @@ import logging
 import sys
 
 
-def setup_logging(level=logging.INFO):
+def setup_logging():
     """
     Set up logging configuration.
-    Args:
-        level: Logging level (default: INFO)
     Returns:
         Logger object
     """
@@ -20,7 +18,7 @@ def setup_logging(level=logging.INFO):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
-    logger.setLevel(level)
+    logger.setLevel(logging.INFO)
     logger.propagate = False
     return logger
 

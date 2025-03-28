@@ -49,17 +49,11 @@ def main():
         action="store_true",
         help="Show detailed squashed/structured ancestors/descendants in terminal",
     )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose logging",
-    )
 
     args = parser.parse_args()
-    
+
     # Set up logging
-    log_level = utils.logging.DEBUG if args.verbose else utils.logging.INFO
-    logger = utils.setup_logging(level=log_level)
+    logger = utils.setup_logging()
 
     try:
         # Create output directory if it doesn't exist
@@ -118,7 +112,9 @@ def main():
                     model_node = all_matches[0]
                     logger.info(f"Using model: {model_node}")
             else:
-                logger.warning(f"No matches found for '{model_node}'. Results may be empty or incomplete.")
+                logger.warning(
+                    f"No matches found for '{model_node}'. Results may be empty or incomplete."
+                )
 
         logger.info("========================================")
         # Find all ancestors for a specific model and column
@@ -199,12 +195,13 @@ def main():
         return 0
     except Exception as e:
         logger.error(f"Error: {str(e)}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
+        import traceback
+
+        traceback.print_exc()
         return 1
 
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

@@ -72,3 +72,10 @@ def find_potential_matches(lineage_data, model_name):
     """Find potential model matches based on partial name match."""
     model_name = model_name.lower()
     return [model for model in lineage_data.keys() if model_name in model.lower()]
+
+
+def find_exact_name_matches(lineage_data, model_name):
+    """Find models that match exactly by node name (after the resource type and package)."""
+    model_name = model_name.lower()
+    # Extract just the name part from full node paths like 'model.analytics.aicg__fact_user'
+    return [model for model in lineage_data.keys() if model.lower().split(".")[-1] == model_name]

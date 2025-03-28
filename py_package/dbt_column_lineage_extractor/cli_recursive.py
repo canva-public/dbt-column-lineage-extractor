@@ -92,29 +92,55 @@ def main():
             model_node not in lineage_to_direct_parents
             and model_node not in lineage_to_direct_children
         ):
-            # Search for potential matches in both lineage files
-            parent_matches = utils.find_potential_matches(lineage_to_direct_parents, model_node)
-            child_matches = utils.find_potential_matches(lineage_to_direct_children, model_node)
+            # First try to find exact matches by name (model.package.name -> name)
+            parent_exact_matches = utils.find_exact_name_matches(
+                lineage_to_direct_parents, model_node
+            )
+            child_exact_matches = utils.find_exact_name_matches(
+                lineage_to_direct_children, model_node
+            )
+            exact_matches = list(set(parent_exact_matches + child_exact_matches))
 
-            # Combine unique matches
-            all_matches = list(set(parent_matches + child_matches))
-
-            if all_matches:
-                if len(all_matches) > 1:
+            # If we have exact matches, only consider those
+            if exact_matches:
+                if len(exact_matches) > 1:
                     logger.error(
-                        "\nError: Multiple potential matches found. Please use one of the following full node paths:"
+                        "\nError: Multiple models with the same name found. Please use one of the following full node paths:"
                     )
-                    for match in sorted(all_matches):
+                    for match in sorted(exact_matches):
                         logger.info(f"  - {match}")
                     return 1
                 else:
-                    # Single match found - use it automatically
-                    model_node = all_matches[0]
+                    # Single exact match found - use it automatically
+                    model_node = exact_matches[0]
                     logger.info(f"Using model: {model_node}")
             else:
-                logger.warning(
-                    f"No matches found for '{model_node}'. Results may be empty or incomplete."
-                )
+                # Fall back to substring matching to find potential matches
+                parent_matches = utils.find_potential_matches(lineage_to_direct_parents, model_node)
+                child_matches = utils.find_potential_matches(lineage_to_direct_children, model_node)
+
+                # Combine unique matches
+                all_matches = list(set(parent_matches + child_matches))
+
+                if all_matches:
+                    # Single match found - use it automatically
+                    if len(all_matches) == 1:
+                        model_node = all_matches[0]
+                        logger.info(f"Using model: {model_node}")
+                    else:
+                        # For multiple substring matches, just display information without error
+                        logger.info(
+                            "\nMultiple potential matches found. Using best match, but you can use one of the following full node paths for precision:"
+                        )
+                        for match in sorted(all_matches):
+                            logger.info(f"  - {match}")
+                        # Use the most likely match (shortest one)
+                        model_node = min(all_matches, key=len)
+                        logger.info(f"Automatically selecting: {model_node}")
+                else:
+                    logger.warning(
+                        f"No matches found for '{model_node}'. Results may be empty or incomplete."
+                    )
 
         logger.info("========================================")
         # Find all ancestors for a specific model and column

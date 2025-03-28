@@ -168,6 +168,9 @@ class DbtColumnLineageExtractor:
                 # Try to find the node by name
                 matching_nodes = self._resolve_node_by_name(selector_expr)
                 expanded_models.update(matching_nodes)
+
+            # exclude sources after expansion
+            expanded_models = [x for x in expanded_models if not x.startswith("source.")]
         
         return list(expanded_models)
     

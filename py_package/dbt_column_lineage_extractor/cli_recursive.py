@@ -141,6 +141,8 @@ def main():
                     logger.warning(
                         f"No matches found for '{model_node}'. Results may be empty or incomplete."
                     )
+                    logger.warning("Skipping output generation.")
+                    return 1
 
         logger.info("========================================")
         # Find all ancestors for a specific model and column
@@ -173,7 +175,12 @@ def main():
             utils.pretty_print_dict(descendants_squashed)
             logger.info("---structured descendants---")
             utils.pretty_print_dict(descendants_structured)
-
+            
+        # Check if no lineage information was found
+        if not ancestors_structured and not descendants_structured:
+            logger.warning(f"No lineage found for column '{args.column}' in model '{model_node}'. Skipping output generation.")
+            return 0
+            
         # Save outputs based on format
         if args.output_format in ["json", "both"]:
             # Create safe filenames by replacing dots with underscores

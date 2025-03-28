@@ -24,7 +24,6 @@ def main():
     )
     parser.add_argument('--model-list-json', help='Path to a JSON file containing a list of models to extract lineage for. If specified, this takes precedence over --model')
     parser.add_argument('--output-dir', default='./outputs', help='Directory to write output json files, default to ./outputs')
-    parser.add_argument('--show-ui', action='store_true', help='Flag to show lineage outputs in the console')
     parser.add_argument('--continue-on-error', action='store_true', help='Continue processing even if some models fail')
 
     args = parser.parse_args()
@@ -71,12 +70,6 @@ def main():
             utils.write_dict_to_file(
                 lineage_to_direct_children, f"{args.output_dir}/lineage_to_direct_children.json"
             )
-
-            if args.show_ui:
-                print("===== Lineage to Direct Parents =====")
-                utils.pretty_print_dict(lineage_to_direct_parents)
-                print("===== Lineage to Direct Children =====")
-                utils.pretty_print_dict(lineage_to_direct_children)
 
             print("Lineage extraction complete. Output files written to output directory.")
             return 0

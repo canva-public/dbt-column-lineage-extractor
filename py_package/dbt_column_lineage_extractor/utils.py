@@ -3,6 +3,7 @@ import os
 import logging
 import sys
 
+
 def setup_logging(level=logging.INFO):
     """
     Set up logging configuration.
@@ -12,19 +13,21 @@ def setup_logging(level=logging.INFO):
         Logger object
     """
     logger = logging.getLogger("dbt_column_lineage")
-    
+
     if not logger.handlers:
         handler = logging.StreamHandler(sys.stdout)
-        formatter = logging.Formatter('%(message)s')
+        formatter = logging.Formatter("%(message)s")
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        
+
     logger.setLevel(level)
     logger.propagate = False
     return logger
 
+
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
+
 
 def read_json(file_path):
     with open(file_path, "r") as file:
@@ -35,35 +38,37 @@ def pretty_print_dict(dict_to_print):
     """
     Pretty print a dictionary as JSON.
     Logs the formatted JSON and also prints it directly for test compatibility.
-    
+
     Args:
         dict_to_print: Dictionary to print
-    
+
     Returns:
         Formatted JSON string
     """
     formatted_json = json.dumps(dict_to_print, indent=4)
-    
+
     # Log using the logger
     logger = setup_logging()
     logger.info(formatted_json)
-    
+
     # Also print directly for test compatibility
     print(formatted_json)
-    
+
     return formatted_json
 
 
 def write_dict_to_file(dict_to_write, file_path):
     # Create directory if it doesn't exist
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    
+
     with open(file_path, "w") as file:
         json.dump(dict_to_write, file, indent=4)
+
 
 def read_dict_from_file(file_path):
     with open(file_path, "r") as file:
         return json.load(file)
+
 
 def find_potential_matches(lineage_data, model_name):
     """Find potential model matches based on partial name match."""
